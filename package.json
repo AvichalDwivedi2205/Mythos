@@ -1,0 +1,52 @@
+{
+  "name": "mythos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.9",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "convex:sync": "bunx convex codegen && tsc -p convex/tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "test:convex": "vitest run tests/convex",
+    "test:ai": "tsx tests/ai/ai-smoke.ts",
+    "test:e2e": "playwright test",
+    "test": "bun run test:unit && bun run test:convex && bun run test:ai",
+    "test:full": "bun run convex:sync && bun run typecheck && bun run test:unit && bun run test:convex && bun run build && bun run test:ai && bun run test:e2e"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.62",
+    "@convex-dev/agent": "^0.6.1",
+    "@convex-dev/rate-limiter": "^0.3.2",
+    "@convex-dev/workpool": "^0.4.6",
+    "ai": "^6.0.158",
+    "clsx": "^2.1.1",
+    "convex": "^1.35.1",
+    "lucide-react": "^1.8.0",
+    "next": "^16.2.3",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "convex-test": "^0.0.47",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.3",
+    "jsdom": "^29.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.8",
+    "vitest": "^4.1.4"
+  }
+}
