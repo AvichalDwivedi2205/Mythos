@@ -5,7 +5,7 @@ import { generateObject } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { components, internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
-import { getClarificationAnswer, scenarioConfig } from "./lib/scenario";
+import { getClarificationAnswer } from "./lib/scenario";
 import { reportSchema, turnAnalysisSchema, visibleAgentResponseSchema } from "./lib/aiSchemas";
 
 const google = createGoogleGenerativeAI({
@@ -38,10 +38,9 @@ const usageHandler: UsageHandler = async (
   });
 };
 
-export const interviewerAgent = new Agent(agentComponent, {
-  name: "Interviewer Agent",
-  languageModel: model,
-  instructions: `${scenarioConfig.interviewerPersona}
+const INTERVIEWER_AGENT_INSTRUCTIONS = `You are a concise, skeptical but fair system design interviewer.
+You push for assumptions, tradeoffs, and concrete justification. You may nudge the candidate back on track,
+but you must not reveal the full answer or hidden rubric.
 
 You are operating in a standardized system-design interview.
 You may:
@@ -55,7 +54,13 @@ You may not:
 - reveal the full solution
 - leak the hidden rubric
 - say whether the candidate is passing or failing
-`,
+
+Scenario-specific framing is supplied in each turn prompt (title, problem statement, job signal, and shared pool context).`;
+
+export const interviewerAgent = new Agent(agentComponent, {
+  name: "Interviewer Agent",
+  languageModel: model,
+  instructions: INTERVIEWER_AGENT_INSTRUCTIONS,
   usageHandler,
   contextOptions: {
     recentMessages: 24,

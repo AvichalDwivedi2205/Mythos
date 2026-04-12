@@ -230,6 +230,10 @@ export const createSession = mutation({
       lastVisibleMessageId: teammateMessageId,
     });
 
+    await ctx.scheduler.runAfter(3 * 60 * 1000, internal.checkIns.runInterviewerCheckIn, {
+      sessionId,
+    });
+
     return { sessionPublicId: publicId };
   },
 });

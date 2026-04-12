@@ -10,6 +10,7 @@
 
 import type * as aiRuntime from "../aiRuntime.js";
 import type * as channels from "../channels.js";
+import type * as checkIns from "../checkIns.js";
 import type * as lib_aiSchemas from "../lib/aiSchemas.js";
 import type * as lib_db from "../lib/db.js";
 import type * as lib_scenario from "../lib/scenario.js";
@@ -34,6 +35,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   aiRuntime: typeof aiRuntime;
   channels: typeof channels;
+  checkIns: typeof checkIns;
   "lib/aiSchemas": typeof lib_aiSchemas;
   "lib/db": typeof lib_db;
   "lib/scenario": typeof lib_scenario;

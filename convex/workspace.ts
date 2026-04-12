@@ -193,6 +193,15 @@ function mapEventToNotification(type: string, metadataJson: string, createdAt: n
     };
   }
 
+  if (type === "interviewer_check_in") {
+    return {
+      type,
+      title: metadata.title ?? "Interviewer check-in",
+      detail: metadata.detail ?? "Timed pulse from the interviewer channel.",
+      createdAt,
+    };
+  }
+
   if (type === "integrity_warning") {
     return {
       type,

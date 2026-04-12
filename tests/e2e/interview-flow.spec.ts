@@ -5,13 +5,6 @@ test("candidate can start an interview and see the live room", async ({ page }) 
 
   await expect(page.getByRole("button", { name: "Start interview" })).toBeVisible();
   await page.getByPlaceholder("Enter your name").fill("E2E Candidate");
-  await page
-    .getByPlaceholder(
-      "Paste the role, team context, and technical expectations. The scenario keywords are inferred from this plus your resume.",
-    )
-    .fill(
-      "Staff backend role owning real-time messaging, presence, and fan-out for a global chat product.",
-    );
   await page.getByRole("button", { name: "Start interview" }).click();
 
   await expect(page).toHaveURL(/\/interview\/session-/);

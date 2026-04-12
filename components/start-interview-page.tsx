@@ -8,6 +8,7 @@ import { MODES, PHASES, type InterviewMode } from "@/lib/constants";
 import { formatPhaseLabel } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { buildInterviewBlueprint, makeResumeProfile } from "@/lib/interview-blueprint";
+import { INTERVIEW_JOB_DESCRIPTION } from "@/lib/interview-config";
 
 const modeCopy: Record<InterviewMode, { short: string; detail: string }> = {
   assessment: {
@@ -30,9 +31,6 @@ export function StartInterviewPage() {
   const [isPending, startTransition] = useTransition();
   const [candidateName, setCandidateName] = useState("Avi");
   const [mode, setMode] = useState<InterviewMode>("practice");
-  const [jobDescription, setJobDescription] = useState(
-    "Senior backend engineer — distributed systems, real-time messaging, and reliability at scale.",
-  );
   const [resumeText, setResumeText] = useState("");
   const [resumeSummary, setResumeSummary] = useState("");
   const [resumeFileName, setResumeFileName] = useState<string | null>(null);
@@ -42,12 +40,12 @@ export function StartInterviewPage() {
   const blueprintPreview = useMemo(() => {
     return buildInterviewBlueprint({
       candidateName: candidateName.trim() || "Candidate",
-      jobDescription,
+      jobDescription: INTERVIEW_JOB_DESCRIPTION,
       resumeSummary,
       resumeText,
       teammateSpecializationOverride: null,
     });
-  }, [candidateName, jobDescription, resumeSummary, resumeText]);
+  }, [candidateName, resumeSummary, resumeText]);
 
   async function onResumeFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -101,18 +99,12 @@ export function StartInterviewPage() {
     e.preventDefault();
     setError(null);
 
-    const jd = jobDescription.trim();
-    if (!jd) {
-      setError("Add a job description so the interview can match a realistic system design problem.");
-      return;
-    }
-
     startTransition(async () => {
       try {
         const result = await createSession({
           candidateName: candidateName.trim() || "Candidate",
           mode,
-          jobDescription: jd,
+          jobDescription: INTERVIEW_JOB_DESCRIPTION,
           resumeText: resumeText.trim(),
           resumeSummary: resumeSummary.trim() || resumeText.trim().slice(0, 600),
           ...(resumeFileName?.trim() ? { resumeFileName: resumeFileName.trim() } : {}),
@@ -260,7 +252,7 @@ export function StartInterviewPage() {
                     <span style={{ fontSize: 12, color: "var(--txt2)" }}>{resumeFileName}</span>
                   ) : (
                     <span style={{ fontSize: 12, color: "var(--txt2)" }}>
-                      PDF or image — OCR via Gemini 3.1 Flash Lite
+                      PDF or image
                     </span>
                   )}
                 </div>
@@ -268,15 +260,25 @@ export function StartInterviewPage() {
 
               <div className="setup-section">
                 <div className="rl" style={{ marginBottom: 8 }}>
-                  Job description
+                  Role description (fixed for this room)
                 </div>
-                <textarea
+                <div
                   className="inp setup-inp"
-                  style={{ minHeight: 120, resize: "vertical" }}
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
-                  placeholder="Paste the role, team context, and technical expectations. The scenario keywords are inferred from this plus your resume."
-                />
+                  style={{
+                    minHeight: 100,
+                    resize: "none",
+                    userSelect: "text",
+                    opacity: 0.92,
+                    cursor: "default",
+                  }}
+                >
+                  {INTERVIEW_JOB_DESCRIPTION}
+                </div>
+                <div className="inh" style={{ marginTop: 6 }}>
+                  Scenario is inferred from this posting plus your resume. Override with{" "}
+                  <code className="mono-pill">NEXT_PUBLIC_INTERVIEW_JOB_DESCRIPTION</code> at build
+                  time if needed.
+                </div>
               </div>
 
               <div className="setup-section">

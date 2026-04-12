@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StartInterviewPage } from "@/components/start-interview-page";
 import { ThemeProvider } from "@/components/theme-provider";
+import { INTERVIEW_JOB_DESCRIPTION } from "@/lib/interview-config";
 
 const push = vi.fn();
 const createSession = vi.fn();
@@ -32,22 +33,17 @@ describe("StartInterviewPage", () => {
 
     expect(screen.getByText("Start Interview")).toBeInTheDocument();
     expect(screen.getByText("Start a new session")).toBeInTheDocument();
+    expect(screen.getByText(INTERVIEW_JOB_DESCRIPTION)).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Enter your name"), {
       target: { value: "Avi" },
     });
-    fireEvent.change(
-      screen.getByPlaceholderText(
-        "Paste the role, team context, and technical expectations. The scenario keywords are inferred from this plus your resume.",
-      ),
-      { target: { value: "We need a senior backend engineer for real-time chat." } },
-    );
     fireEvent.click(screen.getByRole("button", { name: "Start interview" }));
 
     expect(createSession).toHaveBeenCalledWith({
       candidateName: "Avi",
       mode: "practice",
-      jobDescription: "We need a senior backend engineer for real-time chat.",
+      jobDescription: INTERVIEW_JOB_DESCRIPTION,
       resumeText: "",
       resumeSummary: "",
     });

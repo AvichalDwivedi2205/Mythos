@@ -17,9 +17,13 @@ import { api } from "@/convex/_generated/api";
 import { PHASES, TEAMMATE_SPECIALIZATIONS, type InterviewPhase } from "@/lib/constants";
 import { formatPhaseLabel, formatSessionElapsed, formatTimer } from "@/lib/utils";
 import { ShellTopbar } from "./shell-topbar";
+import { SolutionMarkdownEditor } from "./solution-markdown-editor";
 import { ThemeToggle } from "./theme-toggle";
+import type { Id } from "@/convex/_generated/dataModel";
 
 type ChannelKind = "interviewer" | "teammate";
+
+type RoomToast = { id: number; title: string; detail: string };
 
 const TIMER_RING_C = 2 * Math.PI * 30;
 
@@ -87,7 +91,8 @@ function bubbleAccent(badgeKind: string | null, speakerType: string) {
 export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ChannelKind>("interviewer");
-  const [draft, setDraft] = useState("");
+  const [draftInterviewer, setDraftInterviewer] = useState("");
+  const [draftTeammate, setDraftTeammate] = useState("");
   const [noteSearch, setNoteSearch] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [noteLabel, setNoteLabel] = useState<
@@ -102,7 +107,12 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   const [streamResponses, setStreamResponses] = useState(true);
   const [solutionDraft, setSolutionDraft] = useState("");
   const [integrityWarning, setIntegrityWarning] = useState<IntegrityWarning | null>(null);
+  const [toasts, setToasts] = useState<RoomToast[]>([]);
+  const [tabUnread, setTabUnread] = useState({ interviewer: false, teammate: false });
   const solutionSeededRef = useRef(false);
+  const notifyBootstrappedRef = useRef(false);
+  const lastAgentInterviewerIdRef = useRef<Id<"messages"> | null>(null);
+  const lastAgentTeammateIdRef = useRef<Id<"messages"> | null>(null);
   const deferredNoteSearch = useDeferredValue(noteSearch);
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const signalsRef = useRef<HTMLButtonElement | null>(null);
@@ -120,10 +130,16 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     channelKind: "teammate",
   });
   const notes = useQuery(api.notes.listNotes, { sessionPublicId });
-  const channelStream = useQuery(api.channels.getChannelStreamingResponse, {
+  const channelStreamInterviewer = useQuery(api.channels.getChannelStreamingResponse, {
     sessionPublicId,
-    channelKind: activeTab,
+    channelKind: "interviewer",
   });
+  const channelStreamTeammate = useQuery(api.channels.getChannelStreamingResponse, {
+    sessionPublicId,
+    channelKind: "teammate",
+  });
+  const channelStream =
+    activeTab === "interviewer" ? channelStreamInterviewer : channelStreamTeammate;
   const sendMessage = useMutation(api.channels.sendCandidateMessage);
   const createNote = useMutation(api.notes.createNote);
   const updateNote = useMutation(api.notes.updateNote);
@@ -186,10 +202,118 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       top: node.scrollHeight,
       behavior: "smooth",
     });
-  }, [activeMessageTail, activeTab, channelStream?.content, channelStream?.status]);
+  }, [
+    activeMessageTail,
+    activeTab,
+    channelStreamInterviewer?.content,
+    channelStreamInterviewer?.status,
+    channelStreamTeammate?.content,
+    channelStreamTeammate?.status,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      return;
+    }
+    if (Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "interviewer") {
+      setTabUnread((s) => ({ ...s, interviewer: false }));
+    } else {
+      setTabUnread((s) => ({ ...s, teammate: false }));
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!interviewerMessages || !teammateMessages) {
+      return;
+    }
+    if (!notifyBootstrappedRef.current) {
+      const iv = [...interviewerMessages]
+        .reverse()
+        .find((m) => m.speakerType === "interviewer");
+      const tm = [...teammateMessages].reverse().find((m) => m.speakerType === "teammate");
+      lastAgentInterviewerIdRef.current = iv?.id ?? null;
+      lastAgentTeammateIdRef.current = tm?.id ?? null;
+      notifyBootstrappedRef.current = true;
+      return;
+    }
+
+    const iv = [...interviewerMessages]
+      .reverse()
+      .find((m) => m.speakerType === "interviewer");
+    if (iv && iv.id !== lastAgentInterviewerIdRef.current) {
+      lastAgentInterviewerIdRef.current = iv.id;
+      if (activeTab !== "interviewer") {
+        setTabUnread((s) => ({ ...s, interviewer: true }));
+        const t = Date.now();
+        setToasts((list) => [
+          ...list,
+          {
+            id: t,
+            title: "Interviewer replied",
+            detail: "Open the Interviewer tab to read the latest message.",
+          },
+        ]);
+        if (
+          typeof document !== "undefined" &&
+          document.hidden &&
+          "Notification" in window &&
+          Notification.permission === "granted"
+        ) {
+          try {
+            new Notification("Interviewer replied", {
+              body: "There is a new message on the interviewer channel.",
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+
+    const tm = [...teammateMessages].reverse().find((m) => m.speakerType === "teammate");
+    const teammateLabel = room?.channels[1]?.agentRole ?? "Teammate";
+    if (tm && tm.id !== lastAgentTeammateIdRef.current) {
+      lastAgentTeammateIdRef.current = tm.id;
+      if (activeTab !== "teammate") {
+        setTabUnread((s) => ({ ...s, teammate: true }));
+        const t = Date.now();
+        setToasts((list) => [
+          ...list,
+          {
+            id: t,
+            title: `${teammateLabel} replied`,
+            detail: "Open the teammate tab to read the latest message.",
+          },
+        ]);
+        if (
+          typeof document !== "undefined" &&
+          document.hidden &&
+          "Notification" in window &&
+          Notification.permission === "granted"
+        ) {
+          try {
+            new Notification(`${teammateLabel} replied`, {
+              body: "There is a new message on the teammate channel.",
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+  }, [interviewerMessages, teammateMessages, activeTab, room]);
 
   useEffect(() => {
     solutionSeededRef.current = false;
+    notifyBootstrappedRef.current = false;
+    lastAgentInterviewerIdRef.current = null;
+    lastAgentTeammateIdRef.current = null;
   }, [sessionPublicId]);
 
   useEffect(() => {
@@ -212,21 +336,31 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     return () => window.clearTimeout(handle);
   }, [solutionDraft, sessionPublicId, saveSolutionDraft]);
 
-  const activeChannel = room?.channels.find((c) => c.kind === activeTab);
+  const interviewerChannelState = room?.channels.find((c) => c.kind === "interviewer");
+  const teammateChannelState = room?.channels.find((c) => c.kind === "teammate");
+  const agentBusyInterviewer =
+    interviewerChannelState?.status === "thinking" ||
+    interviewerChannelState?.status === "streaming";
+  const agentBusyTeammate =
+    teammateChannelState?.status === "thinking" || teammateChannelState?.status === "streaming";
   const agentBusy =
-    activeChannel?.status === "thinking" || activeChannel?.status === "streaming";
+    activeTab === "interviewer" ? agentBusyInterviewer : agentBusyTeammate;
   const showStreamPreview =
     streamResponses && channelStream && channelStream.content.trim().length > 0;
   const showThinkingIndicator =
     agentBusy && (!streamResponses || !channelStream || channelStream.content.trim().length === 0);
 
   async function onSendMessage() {
-    const content = draft.trim();
+    const channelKind = activeTab;
+    const content =
+      (channelKind === "interviewer" ? draftInterviewer : draftTeammate).trim();
     if (!content) {
       return;
     }
 
-    if (agentBusy) {
+    const busyForChannel =
+      channelKind === "interviewer" ? agentBusyInterviewer : agentBusyTeammate;
+    if (busyForChannel) {
       return;
     }
 
@@ -235,7 +369,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       try {
         const result = await sendMessage({
           sessionPublicId,
-          channelKind: activeTab,
+          channelKind,
           content,
           streamResponse: streamResponses,
         });
@@ -244,7 +378,11 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
           return;
         }
         setIntegrityWarning(null);
-        setDraft("");
+        if (channelKind === "interviewer") {
+          setDraftInterviewer("");
+        } else {
+          setDraftTeammate("");
+        }
       } catch (sendError) {
         setError(sendError instanceof Error ? sendError.message : "Unable to send message.");
       }
@@ -577,23 +715,27 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
               className={`tab${activeTab === "interviewer" ? " on-i" : ""}`}
               data-active={activeTab === "interviewer"}
               data-tab="interviewer"
+              data-pending={agentBusyInterviewer ? "true" : "false"}
               onClick={() => setActiveTab("interviewer")}
               type="button"
             >
               <span className="tav tavi">I</span>
               Interviewer
-              <span className="tsdot" />
+              {tabUnread.interviewer ? <span className="tab-ping" aria-label="Unread" /> : null}
+              <span className="tsdot" title={agentBusyInterviewer ? "Responding…" : undefined} />
             </button>
             <button
               className={`tab${activeTab === "teammate" ? " on-t" : ""}`}
               data-active={activeTab === "teammate"}
               data-tab="teammate"
+              data-pending={agentBusyTeammate ? "true" : "false"}
               onClick={() => setActiveTab("teammate")}
               type="button"
             >
               <span className="tav tavt">{(teammateName.charAt(0) || "T").toUpperCase()}</span>
               {teammateTabLabel}
-              <span className="tsdot bl" />
+              {tabUnread.teammate ? <span className="tab-ping" aria-label="Unread" /> : null}
+              <span className="tsdot bl" title={agentBusyTeammate ? "Responding…" : undefined} />
             </button>
           </div>
 
@@ -667,8 +809,12 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
               <div className="inpr">
                 <textarea
                   className={`inp inp--${activeTab === "interviewer" ? "interviewer" : "teammate"}`}
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  value={activeTab === "interviewer" ? draftInterviewer : draftTeammate}
+                  onChange={(event) =>
+                    activeTab === "interviewer"
+                      ? setDraftInterviewer(event.target.value)
+                      : setDraftTeammate(event.target.value)
+                  }
                   onKeyDown={onComposerKeyDown}
                   disabled={agentBusy}
                   placeholder={
@@ -681,7 +827,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                 <button
                   className={`snd${activeTab === "teammate" ? " bl" : ""}`}
                   disabled={isSending || agentBusy}
-                  onClick={onSendMessage}
+                  onClick={() => void onSendMessage()}
                   type="button"
                   aria-label="Send"
                 >
@@ -793,12 +939,10 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             <div className="ntitle">Final solution</div>
           </div>
           <div className="nbody" style={{ paddingBottom: 8 }}>
-            <textarea
-              className="text-area"
-              style={{ minHeight: 140, fontFamily: "var(--mono, ui-monospace, monospace)", fontSize: 12 }}
+            <SolutionMarkdownEditor
               value={solutionDraft}
-              onChange={(event) => setSolutionDraft(event.target.value)}
-              placeholder="Fill in the template as you go. Autosaves to the shared workspace."
+              onChange={setSolutionDraft}
+              placeholder="Write in Markdown — headings, lists, and code fences supported. Autosaves to the shared workspace."
             />
             <div className="button-row" style={{ marginTop: 8, gap: 8 }}>
               <button
@@ -902,6 +1046,20 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             </div>
           </div>
         </aside>
+      </div>
+
+      <div className="room-toasts" aria-live="polite">
+        {toasts.map((toast) => (
+          <button
+            key={toast.id}
+            type="button"
+            className="room-toast"
+            onClick={() => setToasts((list) => list.filter((t) => t.id !== toast.id))}
+          >
+            <strong>{toast.title}</strong>
+            {toast.detail}
+          </button>
+        ))}
       </div>
     </main>
   );

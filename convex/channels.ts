@@ -106,6 +106,17 @@ export const sendCandidateMessage = mutation({
       throw new Error("Channel not found.");
     }
 
+    const existingRuntime = await ctx.db
+      .query("agentRuntimeState")
+      .withIndex("by_channelId", (query) => query.eq("channelId", channel._id))
+      .unique();
+
+    if (existingRuntime?.status === "thinking" || existingRuntime?.status === "streaming") {
+      throw new Error(
+        "Wait for the current reply on this channel before sending another message.",
+      );
+    }
+
     await rateLimiter.limit(ctx, "sessionMessages", {
       key: `${session.publicId}:${args.channelKind}`,
       throws: true,
