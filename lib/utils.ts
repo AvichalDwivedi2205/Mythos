@@ -13,6 +13,11 @@ export function formatTimer(msRemaining: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+/** Elapsed mm:ss since session start (for message timestamps). */
+export function formatSessionElapsed(createdAt: number, sessionStartedAt: number) {
+  return formatTimer(createdAt - sessionStartedAt);
+}
+
 export function createPublicId(prefix: string) {
   const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
   let suffix = "";

@@ -132,6 +132,31 @@ export const streamingResponseValidator = v.object({
   updatedAt: v.number(),
 });
 
+export const approvedClarificationValidator = v.object({
+  key: v.string(),
+  value: v.string(),
+  keywords: v.array(v.string()),
+});
+
+export const integrityWarningValidator = v.object({
+  code: v.union(
+    v.literal("full_solution_request"),
+    v.literal("hidden_rubric_request"),
+    v.literal("direct_answer_request"),
+  ),
+  title: v.string(),
+  detail: v.string(),
+  severity: v.union(v.literal("warning"), v.literal("critical")),
+  blocked: v.boolean(),
+});
+
+export const sendCandidateMessageResultValidator = v.object({
+  queued: v.boolean(),
+  blocked: v.boolean(),
+  messageId: v.union(v.id("messages"), v.null()),
+  warning: v.union(v.null(), integrityWarningValidator),
+});
+
 export const channelSummaryValidator = v.object({
   kind: channelKindValidator,
   title: v.string(),
@@ -159,6 +184,38 @@ export const scratchNoteValidator = v.object({
   content: v.string(),
   sortOrder: v.number(),
   archived: v.boolean(),
+});
+
+export const solutionWorkspaceViewValidator = v.object({
+  template: v.string(),
+  draftContent: v.string(),
+  finalContent: v.union(v.string(), v.null()),
+  finalSubmittedAt: v.union(v.number(), v.null()),
+  updatedAt: v.number(),
+});
+
+export const workspaceNotificationValidator = v.object({
+  type: v.string(),
+  title: v.string(),
+  detail: v.string(),
+  createdAt: v.number(),
+});
+
+export const sharedWorkspaceValidator = v.object({
+  sessionPublicId: v.string(),
+  jobDescription: v.string(),
+  resumeSummary: v.string(),
+  problemStatement: v.string(),
+  sharedContextSeed: v.string(),
+  approvedClarifications: v.array(approvedClarificationValidator),
+  currentRequirementSummary: v.string(),
+  currentArchitectureSummary: v.string(),
+  latestRiskSummary: v.string(),
+  latestInterviewerChallenge: v.string(),
+  latestTeammateConcern: v.string(),
+  latestCrossChannelDigest: v.string(),
+  notifications: v.array(workspaceNotificationValidator),
+  solution: solutionWorkspaceViewValidator,
 });
 
 export const roomValidator = v.object({

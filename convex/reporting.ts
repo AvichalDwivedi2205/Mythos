@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { getReportBySessionId } from "./lib/db";
+import { getReportBySessionId, getSolutionWorkspace } from "./lib/db";
 import { recommendationValidator } from "./lib/validators";
 
 const reportContextValidator = v.object({
@@ -13,6 +13,7 @@ const reportContextValidator = v.object({
   annotationsText: v.string(),
   countersText: v.string(),
   currentStateText: v.string(),
+  finalSolutionText: v.string(),
 });
 
 export const getReportContext = internalQuery({
@@ -36,14 +37,17 @@ export const getReportContext = internalQuery({
       .order("asc")
       .take(400);
 
-    const counters = await ctx.db
-      .query("sessionCounters")
-      .withIndex("by_sessionId", (query) => query.eq("sessionId", args.sessionId))
-      .unique();
-    const sessionState = await ctx.db
-      .query("sessionState")
-      .withIndex("by_sessionId", (query) => query.eq("sessionId", args.sessionId))
-      .unique();
+    const [counters, sessionState, solutionWorkspace] = await Promise.all([
+      ctx.db
+        .query("sessionCounters")
+        .withIndex("by_sessionId", (query) => query.eq("sessionId", args.sessionId))
+        .unique(),
+      ctx.db
+        .query("sessionState")
+        .withIndex("by_sessionId", (query) => query.eq("sessionId", args.sessionId))
+        .unique(),
+      getSolutionWorkspace(ctx, args.sessionId),
+    ]);
 
     const transcriptText = messages
       .map(
@@ -87,6 +91,9 @@ export const getReportContext = internalQuery({
             latestInterviewerChallenge: sessionState.latestInterviewerChallenge,
             latestTeammateConcern: sessionState.latestTeammateConcern,
             latestCrossChannelDigest: sessionState.latestCrossChannelDigest,
+            problemStatement: session.problemStatement ?? "",
+            resumeSummary: session.resumeSummary ?? "",
+            jobDescription: session.jobDescription ?? "",
           },
           null,
           2,
@@ -103,6 +110,11 @@ export const getReportContext = internalQuery({
       annotationsText,
       countersText,
       currentStateText,
+      finalSolutionText:
+        solutionWorkspace?.finalContent ??
+        solutionWorkspace?.draftContent ??
+        session.solutionTemplate ??
+        "",
     };
   },
 });

@@ -1,14 +1,27 @@
 "use client";
 
-import { useDeferredValue, useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import type { IntegrityWarning } from "@/lib/integrity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { PHASES, TEAMMATE_SPECIALIZATIONS, type InterviewPhase } from "@/lib/constants";
-import { formatPhaseLabel, formatTimer } from "@/lib/utils";
+import { formatPhaseLabel, formatSessionElapsed, formatTimer } from "@/lib/utils";
+import { ShellTopbar } from "./shell-topbar";
+import { ThemeToggle } from "./theme-toggle";
 
 type ChannelKind = "interviewer" | "teammate";
+
+const TIMER_RING_C = 2 * Math.PI * 30;
 
 const defaultNoteColors: Record<string, string> = {
   Requirement: "#f7ec6e",
@@ -39,17 +52,36 @@ function formatModeLabel(mode: string) {
 function getBadgeClass(badgeKind: string | null) {
   switch (badgeKind) {
     case "stress":
-      return "message-badge badge--stress";
+      return "mbg bg-stress";
     case "nudge":
     case "concern":
-      return "message-badge badge--nudge";
+      return "mbg bg-nudge";
     case "team":
     case "brief":
     case "clarification":
-      return "message-badge badge--team";
+      return "mbg bg-team";
     default:
-      return "message-badge badge--brief";
+      return "mbg bg-brief";
   }
+}
+
+function speakerClass(speakerType: string) {
+  if (speakerType === "interviewer") return "spk si";
+  if (speakerType === "teammate") return "spk st";
+  return "spk sc";
+}
+
+function bubbleClass(speakerType: string) {
+  if (speakerType === "candidate") return "bub bc";
+  if (speakerType === "interviewer") return "bub bi";
+  return "bub bt";
+}
+
+function bubbleAccent(badgeKind: string | null, speakerType: string) {
+  if (speakerType !== "interviewer") return "";
+  if (badgeKind === "nudge" || badgeKind === "concern") return " bnudge";
+  if (badgeKind === "stress") return " bstress";
+  return "";
 }
 
 export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) {
@@ -63,11 +95,21 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   >("Design note");
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [signalsOpen, setSignalsOpen] = useState(false);
   const [isSending, startSending] = useTransition();
   const [isEnding, startEnding] = useTransition();
+  const [isSubmittingFinal, startFinalSubmit] = useTransition();
+  const [streamResponses, setStreamResponses] = useState(true);
+  const [solutionDraft, setSolutionDraft] = useState("");
+  const [integrityWarning, setIntegrityWarning] = useState<IntegrityWarning | null>(null);
+  const solutionSeededRef = useRef(false);
   const deferredNoteSearch = useDeferredValue(noteSearch);
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
+  const signalsRef = useRef<HTMLButtonElement | null>(null);
+  const scratchComposerRef = useRef<HTMLDivElement | null>(null);
+
   const room = useQuery(api.sessions.getRoom, { sessionPublicId });
+  const workspace = useQuery(api.workspace.getSharedWorkspace, { sessionPublicId });
   const sessionStatus = useQuery(api.sessions.getSessionStatus, { sessionPublicId });
   const interviewerMessages = useQuery(api.channels.listChannelMessages, {
     sessionPublicId,
@@ -78,11 +120,17 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     channelKind: "teammate",
   });
   const notes = useQuery(api.notes.listNotes, { sessionPublicId });
+  const channelStream = useQuery(api.channels.getChannelStreamingResponse, {
+    sessionPublicId,
+    channelKind: activeTab,
+  });
   const sendMessage = useMutation(api.channels.sendCandidateMessage);
   const createNote = useMutation(api.notes.createNote);
   const updateNote = useMutation(api.notes.updateNote);
   const deleteNote = useMutation(api.notes.deleteNote);
   const endSession = useMutation(api.sessions.endSession);
+  const saveSolutionDraft = useMutation(api.workspace.saveSolutionDraft);
+  const submitFinalSolution = useMutation(api.workspace.submitFinalSolution);
 
   useEffect(() => {
     if (sessionStatus?.sessionStatus === "completed") {
@@ -95,6 +143,16 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     return () => window.clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    function onDocClick(event: MouseEvent) {
+      if (!signalsRef.current?.contains(event.target as Node)) {
+        setSignalsOpen(false);
+      }
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
+
   const activeMessages = activeTab === "interviewer" ? interviewerMessages : teammateMessages;
   const activeMessageTail = activeMessages?.[activeMessages.length - 1]?.id ?? null;
   const teammateMeta =
@@ -102,7 +160,13 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     TEAMMATE_SPECIALIZATIONS.find((entry) => entry.value === room?.channels[1]?.specialization) ??
     TEAMMATE_SPECIALIZATIONS[0];
 
-  const timer = room ? formatTimer(room.timeBudgetMs - (now - room.startedAt)) : "60:00";
+  const remainingMs = room ? Math.max(0, room.timeBudgetMs - (now - room.startedAt)) : 0;
+  const timer = room ? formatTimer(remainingMs) : "60:00";
+  const elapsedMs = room ? Math.min(Math.max(0, now - room.startedAt), room.timeBudgetMs) : 0;
+  const timerProgress = room ? elapsedMs / room.timeBudgetMs : 0;
+  const timerDashOffset = TIMER_RING_C * (1 - timerProgress);
+  const totalMinutes = room ? Math.round(room.timeBudgetMs / 60000) : 60;
+
   const normalizedNoteSearch = deferredNoteSearch.trim().toLowerCase();
   const visibleNotes = notes?.filter((note) => {
     if (!normalizedNoteSearch) {
@@ -122,7 +186,39 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       top: node.scrollHeight,
       behavior: "smooth",
     });
-  }, [activeMessageTail, activeTab]);
+  }, [activeMessageTail, activeTab, channelStream?.content, channelStream?.status]);
+
+  useEffect(() => {
+    solutionSeededRef.current = false;
+  }, [sessionPublicId]);
+
+  useEffect(() => {
+    if (!workspace) {
+      return;
+    }
+    if (!solutionSeededRef.current) {
+      setSolutionDraft(workspace.solution.draftContent);
+      solutionSeededRef.current = true;
+    }
+  }, [workspace]);
+
+  useEffect(() => {
+    if (!solutionSeededRef.current) {
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void saveSolutionDraft({ sessionPublicId, draftContent: solutionDraft });
+    }, 900);
+    return () => window.clearTimeout(handle);
+  }, [solutionDraft, sessionPublicId, saveSolutionDraft]);
+
+  const activeChannel = room?.channels.find((c) => c.kind === activeTab);
+  const agentBusy =
+    activeChannel?.status === "thinking" || activeChannel?.status === "streaming";
+  const showStreamPreview =
+    streamResponses && channelStream && channelStream.content.trim().length > 0;
+  const showThinkingIndicator =
+    agentBusy && (!streamResponses || !channelStream || channelStream.content.trim().length === 0);
 
   async function onSendMessage() {
     const content = draft.trim();
@@ -130,14 +226,24 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       return;
     }
 
+    if (agentBusy) {
+      return;
+    }
+
     setError(null);
     startSending(async () => {
       try {
-        await sendMessage({
+        const result = await sendMessage({
           sessionPublicId,
           channelKind: activeTab,
           content,
+          streamResponse: streamResponses,
         });
+        if (result.blocked && result.warning) {
+          setIntegrityWarning(result.warning);
+          return;
+        }
+        setIntegrityWarning(null);
         setDraft("");
       } catch (sendError) {
         setError(sendError instanceof Error ? sendError.message : "Unable to send message.");
@@ -184,15 +290,96 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     });
   }
 
-  if (room === undefined || interviewerMessages === undefined || teammateMessages === undefined || notes === undefined) {
+  function onSubmitFinalSolution() {
+    setError(null);
+    startFinalSubmit(async () => {
+      try {
+        await submitFinalSolution({
+          sessionPublicId,
+          content: solutionDraft,
+        });
+      } catch (submitError) {
+        setError(
+          submitError instanceof Error ? submitError.message : "Unable to submit final solution.",
+        );
+      }
+    });
+  }
+
+  function renderMessages(
+    messages: NonNullable<typeof interviewerMessages>,
+    sessionStartedAt: number,
+  ) {
+    let lastPhase: string | null = null;
+    return messages.flatMap((message) => {
+      const out: ReactNode[] = [];
+      if (message.phase !== lastPhase) {
+        lastPhase = message.phase;
+        out.push(
+          <div className="phdiv" key={`phase-${message.id}`}>
+            {formatPhaseLabel(message.phase as InterviewPhase)}
+          </div>,
+        );
+      }
+      out.push(
+        <article className="msg" key={message.id}>
+          <div className="mhd">
+            <strong className={speakerClass(message.speakerType)}>{message.speakerLabel}</strong>
+            {message.badgeKind ? (
+              <span className={getBadgeClass(message.badgeKind)}>{message.badgeKind}</span>
+            ) : null}
+            <span className="mt">{formatSessionElapsed(message.createdAt, sessionStartedAt)}</span>
+          </div>
+          <div
+            className={`${bubbleClass(message.speakerType)}${bubbleAccent(
+              message.badgeKind,
+              message.speakerType,
+            )}`}
+          >
+            {message.content}
+          </div>
+          {message.eventSummary ? (
+            <div className="mev">
+              <span
+                className="edot"
+                style={{
+                  background:
+                    message.speakerType === "teammate"
+                      ? "var(--blue)"
+                      : message.badgeKind === "stress"
+                        ? "var(--red)"
+                        : "var(--amber)",
+                }}
+              />
+              {message.eventSummary}
+            </div>
+          ) : null}
+        </article>,
+      );
+      return out;
+    });
+  }
+
+  if (
+    room === undefined ||
+    interviewerMessages === undefined ||
+    teammateMessages === undefined ||
+    notes === undefined
+  ) {
     return (
-      <main className="page-shell centered-state">
-        <div className="loading-card glass-panel">
-          <div className="section-title">Loading room</div>
-          <h1 className="section-heading">Connecting to Convex</h1>
-          <p className="status-copy">
-            Pulling the live session state, channels, notes, and signals into the interview shell.
-          </p>
+      <main className="page-shell page-shell--app">
+        <ShellTopbar meta="Live session" />
+        <div className="centered-state">
+          <div className="loading-card glass-panel gpanel">
+            <div className="section-title">Loading room</div>
+            <h1 className="section-heading">Connecting to Convex</h1>
+            <p className="status-copy">
+              Pulling the live session state, channels, notes, and signals into the interview shell.
+            </p>
+            <p className="loading-card__hint">
+              Session <span className="mono-pill">{sessionPublicId}</span>
+            </p>
+          </div>
         </div>
       </main>
     );
@@ -200,74 +387,95 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
 
   if (room === null) {
     return (
-      <main className="page-shell centered-state">
-        <div className="loading-card glass-panel">
-          <div className="section-title">Session missing</div>
-          <h1 className="section-heading">No interview found</h1>
-          <p className="status-copy">
-            This session ID is invalid or the room has not been created yet.
-          </p>
-          <div className="button-row">
-            <Link className="primary-button" href="/">
-              Back to start
-            </Link>
+      <main className="page-shell page-shell--app">
+        <ShellTopbar meta="Live session" />
+        <div className="centered-state">
+          <div className="loading-card glass-panel gpanel">
+            <div className="section-title">Session missing</div>
+            <h1 className="section-heading">No interview found</h1>
+            <p className="status-copy">
+              This session ID is invalid or the room has not been created yet.
+            </p>
+            <div className="button-row" style={{ marginTop: 8 }}>
+              <Link className="primary-button" href="/">
+                Back to start
+              </Link>
+            </div>
           </div>
         </div>
       </main>
     );
   }
 
+  const phaseNum = PHASES.indexOf(room.currentPhase) + 1;
+  const teammateName = room.channels[1]?.agentRole ?? "Teammate";
+  const teammateTabLabel = `${teammateName} · ${teammateMeta.shortLabel}`;
+
   return (
     <main className="page-shell page-shell--interview">
-      <div className="interview-shell glass-panel">
-        <aside className="sidebar">
-          <div className="brand-lockup">
-            <div className="brand-gem">
-              <div className="brand-dot" />
+      <div className="interview-shell">
+        <aside className="sidebar gpanel" id="left">
+          <div className="brand">
+            <div className="bgem">
+              <div className="gdot" />
             </div>
-            <div className="brand-name">Aperture</div>
+            <span className="bname">Aperture</span>
           </div>
 
-          <div className="timer-ring">
-            <div className="timer-value">{timer}</div>
-            <div className="timer-label">Time remaining</div>
+          <div className="tw">
+            <svg className="rsvg" width="68" height="68" viewBox="0 0 68 68" aria-hidden="true">
+              <circle className="ttrack" cx="34" cy="34" r="30" transform="rotate(-90 34 34)" />
+              <circle
+                className="tprog"
+                cx="34"
+                cy="34"
+                r="30"
+                transform="rotate(-90 34 34)"
+                strokeDasharray={TIMER_RING_C}
+                strokeDashoffset={timerDashOffset}
+              />
+            </svg>
+            <div className="tnum">{timer}</div>
+            <div className="tof">of {totalMinutes} min</div>
           </div>
 
           <div>
-            <div className="section-title">Phases</div>
-            <div className="phase-list" style={{ marginTop: 8 }}>
+            <div className="rl" style={{ marginBottom: 7 }}>
+              Phases
+            </div>
+            <div className="phases">
               {PHASES.map((phase) => (
-                <div
-                  key={phase}
-                  className="phase-item"
-                  data-state={getPhaseState(room.currentPhase, phase)}
-                >
-                  <div className="phase-dot" />
-                  <div className="phase-name">{formatPhaseLabel(phase)}</div>
+                <div key={phase} className={`ph ${getPhaseState(room.currentPhase, phase)}`}>
+                  <div className="pip" />
+                  <span className="phn">{formatPhaseLabel(phase)}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <div className="section-title">Agents</div>
-            <div className="agent-list" style={{ marginTop: 8 }}>
+            <div className="rl" style={{ marginBottom: 7 }}>
+              In this room
+            </div>
+            <div className="agents">
               {room.channels.map((channel) => (
-                <div className="agent-card" key={channel.kind}>
+                <div className="ag" key={channel.kind}>
                   <div
-                    className={`agent-avatar ${channel.kind === "interviewer" ? "avatar--sage" : "avatar--blue"}`}
+                    className={`agav ${channel.kind === "interviewer" ? "avi" : "avt"}`}
                   >
-                    {channel.kind === "interviewer" ? "IN" : "TM"}
+                    {channel.kind === "interviewer"
+                      ? "I"
+                      : (channel.agentRole?.charAt(0) ?? "T").toUpperCase()}
                   </div>
-                  <div className="agent-meta">
-                    <div className="agent-name">{channel.agentRole}</div>
-                    <div className="agent-role">
+                  <div className="agin">
+                    <div className="agn">{channel.agentRole}</div>
+                    <div className="agr">
                       {channel.kind === "interviewer"
-                        ? `${channel.mode} mode`
-                        : channel.specialization ?? "Teammate"}
+                        ? `${formatModeLabel(room.mode)} · ${channel.mode}`
+                        : channel.specialization ?? teammateMeta.label}
                     </div>
                   </div>
-                  <div className="presence-dot" />
+                  <div className="pulse" />
                 </div>
               ))}
             </div>
@@ -275,230 +483,422 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
 
           <div className="spacer" />
 
-          <div className="mini-card glass-panel">
-            <div className="section-title">Live signals</div>
-            <div className="section-copy" style={{ marginTop: 10 }}>
-              Requirements {room.signals.requirementsScore} · Architecture {room.signals.architectureScore} ·
-              Tradeoffs {room.signals.tradeoffScore} · Collaboration {room.signals.collaborationScore}
+          <div className="rfoot">
+            <div className="mbadge2">{formatModeLabel(room.mode)}</div>
+            <div className="fbtns">
+              <button
+                className={`ibt strig${signalsOpen ? " open" : ""}`}
+                ref={signalsRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSignalsOpen((o) => !o);
+                }}
+                type="button"
+                title="Live signals"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <polyline
+                    points="22 12 18 12 15 21 9 3 6 12 2 12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="spop">
+                  <div className="sph">Live Signals</div>
+                  {(
+                    [
+                      ["Requirements", room.signals.requirementsScore, "var(--sage)"],
+                      ["Architecture", room.signals.architectureScore, "var(--blue)"],
+                      ["Tradeoffs", room.signals.tradeoffScore, "var(--amber)"],
+                      ["Collaboration", room.signals.collaborationScore, "var(--sage)"],
+                    ] as const
+                  ).map(([label, value, color]) => (
+                    <div className="sr" key={label}>
+                      <div className="snm">{label}</div>
+                      <div className="str">
+                        <div className="sfi" style={{ width: `${value}%`, background: color }} />
+                      </div>
+                      <div className="svl">{value}</div>
+                    </div>
+                  ))}
+                  <div className="sr">
+                    <div className="snm">Nudges given</div>
+                    <div className="str">
+                      <div
+                        className="sfi"
+                        style={{
+                          width: `${Math.min(100, room.signals.nudgesGiven * 18)}%`,
+                          background: "var(--red)",
+                        }}
+                      />
+                    </div>
+                    <div className="svl">{room.signals.nudgesGiven}</div>
+                  </div>
+                  <div className="sr">
+                    <div className="snm">Stress</div>
+                    <div className="str">
+                      <div
+                        className="sfi"
+                        style={{
+                          width: `${Math.min(100, room.counters.stressCount * 20)}%`,
+                          background: "var(--amber)",
+                        }}
+                      />
+                    </div>
+                    <div className="svl">{room.counters.stressCount}</div>
+                  </div>
+                </div>
+              </button>
+              <ThemeToggle />
             </div>
           </div>
         </aside>
 
-        <section className="room-main">
-          <div className="room-topbar">
+        <section className="room-main" id="center">
+          <div className="ctop gpanel">
             <div>
-              <div className="room-title">{room.title}</div>
-              <div className="room-subtitle">
-                {room.subtitle} · {room.candidateName} · {room.rubricVersion}
+              <div className="sname">{room.title}</div>
+              <div className="ssub">
+                {room.subtitle} · {room.candidateName}
               </div>
             </div>
-            <div className="button-row">
-              <div className="mode-badge">
-                <span className="live-dot" />
-                {formatModeLabel(room.mode)} mode
-              </div>
-              <button className="danger-button" onClick={onEndSession} disabled={isEnding} type="button">
-                {isEnding ? "Ending..." : "End session"}
-              </button>
+            <div className="pchip">
+              <span className="pcdot" />
+              Phase {phaseNum} · {formatPhaseLabel(room.currentPhase)}
             </div>
+            <button className="endbtn" onClick={onEndSession} disabled={isEnding} type="button">
+              {isEnding ? "Ending…" : "End Session"}
+            </button>
           </div>
 
-          <div className="tabs">
+          <div className="tabs gpanel">
             <button
-              className="tab-button"
+              className={`tab${activeTab === "interviewer" ? " on-i" : ""}`}
               data-active={activeTab === "interviewer"}
+              data-tab="interviewer"
               onClick={() => setActiveTab("interviewer")}
               type="button"
             >
-              <span className="tab-avatar avatar--sage">IN</span>
+              <span className="tav tavi">I</span>
               Interviewer
+              <span className="tsdot" />
             </button>
             <button
-              className="tab-button"
+              className={`tab${activeTab === "teammate" ? " on-t" : ""}`}
               data-active={activeTab === "teammate"}
+              data-tab="teammate"
               onClick={() => setActiveTab("teammate")}
               type="button"
             >
-              <span className="tab-avatar avatar--blue">{teammateMeta.shortLabel}</span>
-              {room.channels[1]?.agentRole ?? "Teammate"}
+              <span className="tav tavt">{(teammateName.charAt(0) || "T").toUpperCase()}</span>
+              {teammateTabLabel}
+              <span className="tsdot bl" />
             </button>
           </div>
 
           <div className="conversation">
-            <div className="message-scroll" data-testid="message-scroll" ref={messageScrollRef}>
-              <div className="system-line">
+            <div className="msgs" data-testid="message-scroll" ref={messageScrollRef}>
+              <div className="sysln">
                 <span>
                   {activeTab === "interviewer"
                     ? `Interviewer channel · ${formatModeLabel(room.mode)} mode · Rubric ${room.rubricVersion}`
-                    : `${room.channels[1]?.agentRole ?? "Teammate"} · ${
-                        room.channels[1]?.specialization ?? teammateMeta.label
-                      } · Teammate channel`}
+                    : `${teammateName} · ${room.channels[1]?.specialization ?? teammateMeta.label} · Teammate channel`}
                 </span>
               </div>
 
-              <div className="system-line system-line--phase">
-                <span>
-                  Phase: {formatPhaseLabel(room.currentPhase)} · Status: {sessionStatus?.sessionStatus ?? room.status}
-                </span>
-              </div>
-
-              <div className="message-list">
-                {activeMessages?.map((message) => (
-                  <article className="message" key={message.id}>
-                    <div className="message-meta">
-                      <strong className={`speaker--${message.speakerType}`}>{message.speakerLabel}</strong>
-                      {message.badgeKind ? (
-                        <span className={getBadgeClass(message.badgeKind)}>{message.badgeKind}</span>
-                      ) : null}
-                      {message.eventSummary ? <span className="agent-role">{message.eventSummary}</span> : null}
-                    </div>
-                    <div
-                      className={`bubble ${
-                        message.speakerType === "candidate"
-                          ? "bubble--candidate"
-                          : message.speakerType === "interviewer"
-                            ? "bubble--interviewer"
-                            : "bubble--teammate"
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                  </article>
-                ))}
-              </div>
+              {activeMessages && room ? renderMessages(activeMessages, room.startedAt) : null}
+              {showThinkingIndicator ? (
+                <article className="msg" aria-live="polite">
+                  <div className="mhd">
+                    <strong className={speakerClass(activeTab)}>
+                      {activeTab === "interviewer" ? "Interviewer" : teammateName}
+                    </strong>
+                    <span className="mbg bg-team">thinking</span>
+                    <span className="mt">…</span>
+                  </div>
+                  <div className={`${bubbleClass(activeTab === "interviewer" ? "interviewer" : "teammate")} typing-dots`}>
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                  </div>
+                </article>
+              ) : null}
+              {showStreamPreview ? (
+                <article className="msg" aria-live="polite">
+                  <div className="mhd">
+                    <strong className={speakerClass(activeTab)}>
+                      {activeTab === "interviewer" ? "Interviewer" : teammateName}
+                    </strong>
+                    <span className="mbg bg-team">streaming</span>
+                    <span className="mt">live</span>
+                  </div>
+                  <div
+                    className={`${bubbleClass(activeTab === "interviewer" ? "interviewer" : "teammate")} stream-preview`}
+                  >
+                    {channelStream?.content}
+                  </div>
+                </article>
+              ) : null}
             </div>
 
-            <div className="composer">
-              <div className="composer-row">
+            <div
+              className={`inpa composer composer--${activeTab === "interviewer" ? "interviewer" : "teammate"}`}
+            >
+              {integrityWarning ? (
+                <div
+                  className="mev"
+                  style={{
+                    marginBottom: 10,
+                    background: "rgba(251, 191, 36, 0.12)",
+                    borderColor: "rgba(251, 191, 36, 0.35)",
+                    color: "var(--amber)",
+                  }}
+                >
+                  <span className="edot" style={{ background: "var(--amber)" }} />
+                  <div>
+                    <strong>{integrityWarning.title}</strong>
+                    <div style={{ marginTop: 4, fontSize: 13, opacity: 0.95 }}>
+                      {integrityWarning.detail}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              <div className="inpr">
                 <textarea
-                  className="text-area"
+                  className={`inp inp--${activeTab === "interviewer" ? "interviewer" : "teammate"}`}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={onComposerKeyDown}
-                  placeholder={`Reply in the ${activeTab} lane...`}
+                  disabled={agentBusy}
+                  placeholder={
+                    activeTab === "interviewer"
+                      ? "Reply to interviewer…"
+                      : `Reply to ${teammateName}…`
+                  }
                   rows={1}
                 />
-                <button className="primary-button" disabled={isSending} onClick={onSendMessage} type="button">
-                  {isSending ? "Sending..." : "Send"}
+                <button
+                  className={`snd${activeTab === "teammate" ? " bl" : ""}`}
+                  disabled={isSending || agentBusy}
+                  onClick={onSendMessage}
+                  type="button"
+                  aria-label="Send"
+                >
+                  {isSending ? (
+                    <span style={{ fontSize: 16, letterSpacing: 1, opacity: 0.85 }}>…</span>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  )}
                 </button>
+              </div>
+              <div className="inh" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+                <label style={{ display: "inline-flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={streamResponses}
+                    onChange={(event) => setStreamResponses(event.target.checked)}
+                    disabled={agentBusy}
+                  />
+                  <span>Stream assistant replies</span>
+                </label>
+                <span style={{ opacity: 0.7 }}>Enter to send · Shift+Enter for new line</span>
               </div>
               {error ? <div className="error-copy" style={{ marginTop: 10 }}>{error}</div> : null}
             </div>
           </div>
         </section>
 
-        <aside className="room-side">
-          <div className="stack">
-            <div className="info-card glass-panel">
-              <div className="section-title">Safe live signals</div>
-              <div className="metric-grid" style={{ marginTop: 12 }}>
-                {[
-                  ["Requirements", room.signals.requirementsScore],
-                  ["Architecture", room.signals.architectureScore],
-                  ["Tradeoffs", room.signals.tradeoffScore],
-                  ["Collaboration", room.signals.collaborationScore],
-                ].map(([label, value]) => (
-                  <div className="metric-card" key={label}>
-                    <div className="metric-card__label">{label}</div>
-                    <div className="metric-card__value">{value}</div>
-                    <div className="progress">
-                      <span style={{ width: `${value}%` }} />
+        <aside className="room-side gpanel" id="right">
+          <div className="nhd">
+            <div className="ntitle">Shared brief</div>
+          </div>
+          <div className="nbody" style={{ maxHeight: 200, overflow: "auto", paddingBottom: 8 }}>
+            {workspace?.notifications && workspace.notifications.length > 0 ? (
+              <div style={{ marginBottom: 10 }}>
+                <div className="rl" style={{ marginBottom: 6 }}>
+                  Alerts
+                </div>
+                {workspace.notifications.map((note) => (
+                  <div
+                    key={`${note.type}-${note.createdAt}`}
+                    className="mev"
+                    style={{ marginBottom: 8, textAlign: "left" }}
+                  >
+                    <span
+                      className="edot"
+                      style={{
+                        background:
+                          note.type === "stress_event_started"
+                            ? "var(--red)"
+                            : note.type === "integrity_warning"
+                              ? "var(--amber)"
+                              : "var(--blue)",
+                      }}
+                    />
+                    <div>
+                      <strong style={{ fontSize: 12 }}>{note.title}</strong>
+                      <div style={{ fontSize: 12, marginTop: 4, opacity: 0.9 }}>{note.detail}</div>
                     </div>
                   </div>
                 ))}
               </div>
+            ) : null}
+            <div className="sysln" style={{ textAlign: "left", padding: "4px 0 6px" }}>
+              <span>Problem + pool context</span>
             </div>
-
-            <div className="info-card glass-panel">
-              <div className="section-title">Counters</div>
-              <div className="section-copy" style={{ marginTop: 10 }}>
-                Nudges {room.counters.nudgeCount} · Stress {room.counters.stressCount} · Clarifications{" "}
-                {room.counters.clarificationCount} · Concerns {room.counters.teammateConcernCount}
+            <div className="sticky" style={{ background: "#e0e7ff" }}>
+              <div className="shd">
+                <div className="slbl">Problem</div>
+              </div>
+              <div
+                className="sta"
+                style={{ minHeight: 72, resize: "none", userSelect: "text", fontSize: 12 }}
+              >
+                {workspace?.problemStatement ?? room.title}
               </div>
             </div>
+            {workspace?.jobDescription ? (
+              <div className="sticky" style={{ background: "#fef3c7", marginTop: 8 }}>
+                <div className="shd">
+                  <div className="slbl">Job description</div>
+                </div>
+                <div
+                  className="sta"
+                  style={{ minHeight: 56, resize: "none", userSelect: "text", fontSize: 12 }}
+                >
+                  {workspace.jobDescription}
+                </div>
+              </div>
+            ) : null}
+            {workspace?.sharedContextSeed ? (
+              <div className="sticky" style={{ background: "#dbeafe", marginTop: 8 }}>
+                <div className="shd">
+                  <div className="slbl">Shared pool seed</div>
+                </div>
+                <div
+                  className="sta"
+                  style={{ minHeight: 56, resize: "none", userSelect: "text", fontSize: 12 }}
+                >
+                  {workspace.sharedContextSeed}
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          <div className="info-card glass-panel notes-panel">
-            <div className="notes-panel__header">
-              <div>
-                <div className="section-title">Private scratch pad</div>
-                <div className="notes-panel__meta">
-                  {normalizedNoteSearch
-                    ? `${visibleNotes?.length ?? 0} of ${notes.length} notes`
-                    : `${notes.length} notes`}
-                </div>
-              </div>
+          <div className="nhd" style={{ marginTop: 4 }}>
+            <div className="ntitle">Final solution</div>
+          </div>
+          <div className="nbody" style={{ paddingBottom: 8 }}>
+            <textarea
+              className="text-area"
+              style={{ minHeight: 140, fontFamily: "var(--mono, ui-monospace, monospace)", fontSize: 12 }}
+              value={solutionDraft}
+              onChange={(event) => setSolutionDraft(event.target.value)}
+              placeholder="Fill in the template as you go. Autosaves to the shared workspace."
+            />
+            <div className="button-row" style={{ marginTop: 8, gap: 8 }}>
+              <button
+                className="primary-button"
+                type="button"
+                disabled={isSubmittingFinal || !solutionDraft.trim()}
+                onClick={onSubmitFinalSolution}
+              >
+                {isSubmittingFinal
+                  ? "Submitting…"
+                  : workspace?.solution.finalSubmittedAt
+                    ? "Update final submission"
+                    : "Submit final solution"}
+              </button>
             </div>
+            {workspace?.solution.finalSubmittedAt ? (
+              <p className="status-copy" style={{ marginTop: 8 }}>
+                Final solution locked in at{" "}
+                {new Date(workspace.solution.finalSubmittedAt).toLocaleString()}.
+              </p>
+            ) : null}
+          </div>
 
-            <div className="notes-panel__controls">
-              <input
-                className="text-input note-search-input"
-                value={noteSearch}
-                onChange={(event) => setNoteSearch(event.target.value)}
-                placeholder="Search notes, requirements, and tradeoffs..."
-              />
-            </div>
+          <div className="nhd">
+            <div className="ntitle">Scratch Pad</div>
+            <button
+              className="abtn"
+              type="button"
+              title="Scroll to new note"
+              aria-label="Scroll to new note"
+              onClick={() =>
+                scratchComposerRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+              }
+            >
+              +
+            </button>
+          </div>
 
-            <div className="notes-list-scroll notes-scroll">
-              <div className="note-list">
-                {visibleNotes && visibleNotes.length > 0 ? (
-                  visibleNotes.map((note) => (
-                    <div className="note-card" key={note.id}>
-                      <div className="note-label">
-                        <span className="note-swatch" style={{ background: note.color }} />
-                        {note.label}
-                      </div>
-                      <textarea
-                        className="text-area"
-                        value={note.content}
-                        onChange={(event) => {
-                          void updateNote({
-                            noteId: note.id,
-                            content: event.target.value,
-                            label: note.label,
-                          });
-                        }}
-                      />
-                      <button className="ghost-button" onClick={() => void deleteNote({ noteId: note.id })} type="button">
-                        Delete note
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <div className="empty-copy note-empty">
-                    No notes match this search yet. Try a different term or add a new note below.
+          <input
+            className="text-input scratch-search"
+            value={noteSearch}
+            onChange={(event) => setNoteSearch(event.target.value)}
+            placeholder="Search notes…"
+          />
+
+          <div className="nbody notes-list-scroll">
+            {visibleNotes && visibleNotes.length > 0 ? (
+              visibleNotes.map((note) => (
+                <div className="sticky" key={note.id} style={{ background: note.color }}>
+                  <div className="shd">
+                    <div className="slbl">{note.label}</div>
+                    <button
+                      className="scls"
+                      type="button"
+                      aria-label="Remove note"
+                      onClick={() => void deleteNote({ noteId: note.id })}
+                    >
+                      {"\u2715"}
+                    </button>
                   </div>
-                )}
-              </div>
-
-              <div className="note-card notes-composer">
-                <div className="note-label">
-                  <span className="note-swatch" style={{ background: defaultNoteColors[noteLabel] }} />
-                  New note
+                  <textarea
+                    className="sta"
+                    value={note.content}
+                    onChange={(event) => {
+                      void updateNote({
+                        noteId: note.id,
+                        content: event.target.value,
+                        label: note.label,
+                      });
+                    }}
+                  />
                 </div>
-                <select
-                  className="select-input"
-                  value={noteLabel}
-                  onChange={(event) =>
-                    setNoteLabel(event.target.value as typeof noteLabel)
-                  }
-                >
-                  {Object.keys(defaultNoteColors).map((label) => (
-                    <option key={label} value={label}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <textarea
-                  className="text-area"
-                  value={noteDraft}
-                  onChange={(event) => setNoteDraft(event.target.value)}
-                  placeholder="Capture a requirement, risk, tradeoff, or open question."
-                />
-                <button className="primary-button" onClick={onCreateNote} type="button">
-                  Add note
-                </button>
+              ))
+            ) : (
+              <div className="empty-copy note-empty">
+                No notes match this search. Add a note below.
               </div>
+            )}
+
+            <div className="scratch-composer" ref={scratchComposerRef}>
+              <select
+                className="select-input"
+                value={noteLabel}
+                onChange={(event) => setNoteLabel(event.target.value as typeof noteLabel)}
+              >
+                {Object.keys(defaultNoteColors).map((label) => (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                className="text-area"
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                placeholder="Capture a requirement, risk, tradeoff, or open question."
+              />
+              <button className="primary-button" onClick={onCreateNote} type="button">
+                Add note
+              </button>
             </div>
           </div>
         </aside>

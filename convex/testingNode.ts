@@ -32,6 +32,19 @@ export const aiSmokeTest = action({
       sessionPublicId: "test-session",
       title: "Real-Time Chat at Scale",
       subtitle: "System Design · Senior Engineer",
+      jobDescription: "Senior backend — real-time messaging and presence.",
+      resumeSummary: "Prior experience with distributed systems and chat backends.",
+      problemStatement: "Design a global messaging platform with ordering and offline delivery.",
+      sharedContextSeed: "Candidate background: distributed systems. Job focus: messaging.",
+      approvedClarifications: [
+        {
+          key: "ordering",
+          keywords: ["order", "ordering"],
+          value: "Strong ordering is required within each conversation.",
+        },
+      ],
+      solutionTemplate: "# Final Solution Outline\n\n## High-Level Architecture\n- ...",
+      workingSolution: "# Final Solution Outline\n\nDraft with WebSocket + Kafka noted.",
       mode: "assessment",
       currentPhase: "high_level_design",
       candidateName: "Test Candidate",
@@ -67,7 +80,7 @@ export const aiSmokeTest = action({
         collaborationScore: 61,
         nudgesGiven: 1,
       },
-    } as const;
+    };
 
     const interviewer = await generateVisibleResponse(ctx, {
       channelKind: "interviewer",
@@ -95,6 +108,7 @@ export const aiSmokeTest = action({
         .join("\n"),
       countersText: JSON.stringify({ nudgeCount: 1, stressCount: 0, teammateConcernCount: 1 }),
       currentStateText: JSON.stringify(analysis),
+      finalSolutionText: baseContext.workingSolution,
     });
 
     return {

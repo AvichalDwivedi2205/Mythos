@@ -71,6 +71,7 @@ You may:
 - raise risks and failure modes
 - discuss bounded alternatives
 - ask the interviewer for clarification if the scope is ambiguous
+- sound proactive and human, like a sharp peer in the room rather than a passive observer
 
 You may not:
 - solve the interview for the candidate
@@ -87,6 +88,17 @@ type GenerationContext = {
   sessionPublicId: string;
   title: string;
   subtitle: string;
+  jobDescription: string;
+  resumeSummary: string;
+  problemStatement: string;
+  sharedContextSeed: string;
+  approvedClarifications: Array<{
+    key: string;
+    value: string;
+    keywords: string[];
+  }>;
+  solutionTemplate: string;
+  workingSolution: string;
   mode: string;
   currentPhase: string;
   candidateName: string;
@@ -151,7 +163,10 @@ export async function generateVisibleResponse(
     parsed.needsClarification &&
     parsed.clarificationQuestion
   ) {
-    const answer = getClarificationAnswer(parsed.clarificationQuestion);
+    const answer = getClarificationAnswer(
+      parsed.clarificationQuestion,
+      args.context.approvedClarifications,
+    );
     if (answer) {
       return {
         ...parsed,
@@ -213,6 +228,15 @@ export async function generateTurnAnalysis(
 Return a compact, citation-friendly turn analysis for the candidate-visible interaction below.
 
 Scenario: ${context.title}
+Problem statement:
+${context.problemStatement}
+
+Candidate background summary:
+${context.resumeSummary || "Not provided."}
+
+Job description signal:
+${context.jobDescription || "Not provided."}
+
 Mode: ${context.mode}
 Phase: ${context.currentPhase}
 Candidate message (sequence ${context.candidateMessage.sequence}):
@@ -229,6 +253,9 @@ ${context.sessionState.currentArchitectureSummary || "None yet."}
 
 Latest cross-channel digest:
 ${context.sessionState.latestCrossChannelDigest || "None yet."}
+
+Working solution snapshot:
+${context.workingSolution || "No submitted outline yet."}
 
 Live signal values before this turn:
 - Requirements: ${context.signals.requirementsScore}
@@ -263,6 +290,7 @@ export async function generateFinalReport(args: {
   annotationsText: string;
   countersText: string;
   currentStateText: string;
+  finalSolutionText: string;
 }) {
   const prompt = `You are generating the final hiring-style report for a standardized AI-led system design interview.
 
@@ -273,6 +301,9 @@ Mode: ${args.mode}
 
 Current state summary:
 ${args.currentStateText}
+
+Final solution submission:
+${args.finalSolutionText || "No final solution was explicitly submitted."}
 
 Counters:
 ${args.countersText}
@@ -298,7 +329,7 @@ function buildVisiblePrompt(
   channelKind: "interviewer" | "teammate",
   context: GenerationContext,
 ) {
-  const clarificationList = scenarioConfig.approvedClarifications
+  const clarificationList = context.approvedClarifications
     .map((clarification) => `- ${clarification.value}`)
     .join("\n");
 
@@ -307,6 +338,18 @@ function buildVisiblePrompt(
 
 Scenario: ${context.title}
 Subtitle: ${context.subtitle}
+Problem statement:
+${context.problemStatement}
+
+Candidate background summary:
+${context.resumeSummary || "Not provided."}
+
+Job description signal:
+${context.jobDescription || "Not provided."}
+
+Shared pool context:
+${context.sharedContextSeed || "No shared seed yet."}
+
 Mode: ${context.mode}
 Current phase: ${context.currentPhase}
 
@@ -331,6 +374,12 @@ ${context.sessionState.latestRiskSummary || "None yet."}
 Latest teammate concern:
 ${context.sessionState.latestTeammateConcern || "None yet."}
 
+Working solution template:
+${context.solutionTemplate || "No template available."}
+
+Current candidate solution workspace:
+${context.workingSolution || "No draft yet."}
+
 Approved clarifications you may reveal:
 ${clarificationList}
 
@@ -341,6 +390,7 @@ Output rules:
 - otherwise prefer "team" or "clarification" style badges sparingly
 - keep content concise, sharp, and interview-like
 - ask a question whenever possible
+- during deep dive or wrap-up, occasionally force the candidate to consolidate the final solution
 - never give the full solution`;
   }
 
@@ -348,6 +398,18 @@ Output rules:
 
 You are ${context.teammateName}, specialization ${context.teammateSpecialization}.
 Scenario: ${context.title}
+Problem statement:
+${context.problemStatement}
+
+Candidate background summary:
+${context.resumeSummary || "Not provided."}
+
+Job description signal:
+${context.jobDescription || "Not provided."}
+
+Shared pool context:
+${context.sharedContextSeed || "No shared seed yet."}
+
 Mode: ${context.mode}
 Current phase: ${context.currentPhase}
 
@@ -372,8 +434,14 @@ ${context.sessionState.latestRiskSummary || "None yet."}
 Latest interviewer challenge:
 ${context.sessionState.latestInterviewerChallenge || "None yet."}
 
+Working solution template:
+${context.solutionTemplate || "No template available."}
+
+Current candidate solution workspace:
+${context.workingSolution || "No draft yet."}
+
 If you genuinely need clarification from the interviewer on scope or constraints, set needsClarification=true and ask one short clarification question.
 Otherwise keep needsClarification=false.
 
-Your job is to pressure-test the design, raise risks, and collaborate without solving the interview for the candidate.`;
+Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate.`;
 }

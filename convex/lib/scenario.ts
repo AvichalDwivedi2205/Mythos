@@ -108,10 +108,13 @@ export const scenarioConfig = {
   } as const satisfies Record<InterviewMode, string>,
 };
 
-export function getClarificationAnswer(question: string) {
+export function getClarificationAnswer(
+  question: string,
+  clarifications = scenarioConfig.approvedClarifications,
+) {
   const normalized = question.toLowerCase();
 
-  for (const clarification of scenarioConfig.approvedClarifications) {
+  for (const clarification of clarifications) {
     if (clarification.keywords.some((keyword) => normalized.includes(keyword))) {
       return clarification.value;
     }

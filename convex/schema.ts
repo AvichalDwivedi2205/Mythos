@@ -35,6 +35,14 @@ export default defineSchema({
     reportId: v.union(v.id("reports"), v.null()),
     teammateSpecialization: v.string(),
     teammateName: v.string(),
+    jobDescription: v.optional(v.string()),
+    resumeText: v.optional(v.string()),
+    resumeSummary: v.optional(v.string()),
+    resumeFileName: v.optional(v.string()),
+    problemStatement: v.optional(v.string()),
+    approvedClarificationsJson: v.optional(v.string()),
+    solutionTemplate: v.optional(v.string()),
+    sharedContextSeed: v.optional(v.string()),
   })
     .index("by_publicId", ["publicId"])
     .index("by_status_and_startedAt", ["status", "startedAt"]),
@@ -207,6 +215,15 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_sessionId_and_sortOrder", ["sessionId", "sortOrder"]),
+
+  solutionWorkspaces: defineTable({
+    sessionId: v.id("sessions"),
+    template: v.string(),
+    draftContent: v.string(),
+    finalContent: v.union(v.string(), v.null()),
+    finalSubmittedAt: v.union(v.number(), v.null()),
+    updatedAt: v.number(),
+  }).index("by_sessionId", ["sessionId"]),
 
   reports: defineTable({
     sessionId: v.id("sessions"),

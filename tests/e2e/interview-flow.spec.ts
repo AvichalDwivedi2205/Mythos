@@ -3,15 +3,22 @@ import { expect, test } from "@playwright/test";
 test("candidate can start an interview and see the live room", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Start Interview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start interview" })).toBeVisible();
   await page.getByPlaceholder("Enter your name").fill("E2E Candidate");
-  await page.getByRole("button", { name: "Backend" }).click();
+  await page
+    .getByPlaceholder(
+      "Paste the role, team context, and technical expectations. The scenario keywords are inferred from this plus your resume.",
+    )
+    .fill(
+      "Staff backend role owning real-time messaging, presence, and fan-out for a global chat product.",
+    );
   await page.getByRole("button", { name: "Start interview" }).click();
 
   await expect(page).toHaveURL(/\/interview\/session-/);
-  await expect(page.getByText("Real-Time Chat at Scale")).toBeVisible();
+  await expect(page.getByText("Global Messaging Platform")).toBeVisible();
   await expect(page.getByRole("button", { name: /Interviewer/ })).toBeVisible();
-  await expect(page.getByText("Private scratch pad")).toBeVisible();
+  await expect(page.getByText("Scratch Pad")).toBeVisible();
+  await expect(page.getByText("Shared brief")).toBeVisible();
 });
 
 test("candidate can message the interviewer and create a private note", async ({ page }) => {
@@ -21,10 +28,10 @@ test("candidate can message the interviewer and create a private note", async ({
   await page.getByRole("button", { name: "Start interview" }).click();
   await expect(page).toHaveURL(/\/interview\/session-/);
 
-  const initialBubbles = page.locator(".bubble");
+  const initialBubbles = page.locator(".bubble, .bub");
   const initialCount = await initialBubbles.count();
 
-  await page.locator("textarea").first().fill("How strict is ordering within each conversation?");
+  await page.locator(".conversation textarea").first().fill("How strict is ordering within each conversation?");
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect.poll(async () => initialBubbles.count(), { timeout: 60000 }).toBeGreaterThan(

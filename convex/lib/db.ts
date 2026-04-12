@@ -50,3 +50,10 @@ export async function getReportBySessionId(ctx: DbCtx, sessionId: Id<"sessions">
     .withIndex("by_sessionId", (query) => query.eq("sessionId", sessionId))
     .unique();
 }
+
+export async function getSolutionWorkspace(ctx: DbCtx, sessionId: Id<"sessions">) {
+  return await ctx.db
+    .query("solutionWorkspaces")
+    .withIndex("by_sessionId", (query) => query.eq("sessionId", sessionId))
+    .unique();
+}

@@ -9,40 +9,49 @@ import {
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { getReportBySessionId, getSessionByPublicId, getSessionCounters, getSignalState } from "./lib/db";
-import { scenarioConfig } from "./lib/scenario";
 import {
   modeValidator,
   roomValidator,
   sessionStatusValidator,
 } from "./lib/validators";
 import { createPublicId } from "../lib/utils";
+import { buildInterviewBlueprint, serializeClarifications } from "../lib/interview-blueprint";
 
 export const createSession = mutation({
   args: {
     candidateName: v.string(),
     mode: modeValidator,
-    teammateSpecialization: v.union(
-      v.literal("sre_infra"),
-      v.literal("backend"),
-      v.literal("data"),
+    jobDescription: v.string(),
+    resumeText: v.string(),
+    resumeSummary: v.string(),
+    resumeFileName: v.optional(v.string()),
+    teammateSpecialization: v.optional(
+      v.union(v.literal("sre_infra"), v.literal("backend"), v.literal("data")),
     ),
   },
   returns: v.object({ sessionPublicId: v.string() }),
   handler: async (ctx, args) => {
     const now = Date.now();
     const publicId = createPublicId("session");
-    const teammateMeta = scenarioConfig.teammateDefaults[args.teammateSpecialization];
+    const candidateName = args.candidateName.trim() || "Candidate";
+    const blueprint = buildInterviewBlueprint({
+      candidateName,
+      jobDescription: args.jobDescription,
+      resumeSummary: args.resumeSummary,
+      resumeText: args.resumeText,
+      teammateSpecializationOverride: args.teammateSpecialization ?? null,
+    });
 
     const sessionId = await ctx.db.insert("sessions", {
       publicId,
-      candidateName: args.candidateName.trim() || "Candidate",
+      candidateName,
       mode: args.mode,
       status: "active",
-      scenarioId: scenarioConfig.id,
-      scenarioVersion: "2026-04-12",
-      rubricVersion: scenarioConfig.rubricVersion,
-      title: scenarioConfig.title,
-      subtitle: scenarioConfig.subtitle,
+      scenarioId: blueprint.scenarioId,
+      scenarioVersion: new Date(now).toISOString().slice(0, 10),
+      rubricVersion: "v3.0",
+      title: blueprint.title,
+      subtitle: blueprint.subtitle,
       currentPhase: "problem_framing",
       timeBudgetMs: 60 * 60 * 1000,
       startedAt: now,
@@ -50,8 +59,18 @@ export const createSession = mutation({
       interviewerChannelId: null,
       teammateChannelId: null,
       reportId: null,
-      teammateSpecialization: args.teammateSpecialization,
-      teammateName: teammateMeta.name,
+      teammateSpecialization: blueprint.teammateSpecialization,
+      teammateName: blueprint.teammateName,
+      jobDescription: args.jobDescription.trim(),
+      resumeText: args.resumeText.trim(),
+      resumeSummary: args.resumeSummary.trim(),
+      problemStatement: blueprint.problemStatement,
+      approvedClarificationsJson: serializeClarifications(blueprint.approvedClarifications),
+      solutionTemplate: blueprint.solutionTemplate,
+      sharedContextSeed: blueprint.sharedContextSeed,
+      ...(args.resumeFileName?.trim()
+        ? { resumeFileName: args.resumeFileName.trim() }
+        : {}),
     });
 
     const interviewerThreadId = await createThread(ctx, components.agent as never, {
@@ -78,9 +97,9 @@ export const createSession = mutation({
     const teammateChannelId = await ctx.db.insert("channels", {
       sessionId,
       kind: "teammate",
-      title: `${teammateMeta.name} · ${teammateMeta.shortLabel}`,
-      agentRole: teammateMeta.name,
-      specialization: teammateMeta.label,
+      title: `${blueprint.teammateName} · ${blueprint.teammateLabel}`,
+      agentRole: blueprint.teammateName,
+      specialization: blueprint.teammateLabel,
       threadId: teammateThreadId,
       sortOrder: 1,
     });
@@ -93,11 +112,11 @@ export const createSession = mutation({
     await ctx.db.insert("sessionState", {
       sessionId,
       currentArchitectureSummary: "",
-      currentRequirementSummary: "",
-      latestRiskSummary: "",
+      currentRequirementSummary: blueprint.initialRequirementSummary,
+      latestRiskSummary: blueprint.initialRiskSummary,
       latestInterviewerChallenge: "",
       latestTeammateConcern: "",
-      latestCrossChannelDigest: "",
+      latestCrossChannelDigest: blueprint.sharedContextSeed,
       updatedAt: now,
     });
 
@@ -142,7 +161,7 @@ export const createSession = mutation({
     const teammateRuntimeId = await ctx.db.insert("agentRuntimeState", {
       sessionId,
       channelId: teammateChannelId,
-      agentRole: teammateMeta.name,
+      agentRole: blueprint.teammateName,
       status: "idle",
       mode: "collaborate",
       phase: "problem_framing",
@@ -158,7 +177,16 @@ export const createSession = mutation({
       endedAt: null,
     });
 
-    for (const note of scenarioConfig.defaultNotes) {
+    await ctx.db.insert("solutionWorkspaces", {
+      sessionId,
+      template: blueprint.solutionTemplate,
+      draftContent: blueprint.solutionTemplate,
+      finalContent: null,
+      finalSubmittedAt: null,
+      updatedAt: now,
+    });
+
+    for (const note of blueprint.defaultNotes) {
       await ctx.db.insert("scratchNotes", {
         sessionId,
         label: note.label,
@@ -177,7 +205,7 @@ export const createSession = mutation({
       threadId: interviewerThreadId,
       speakerType: "interviewer",
       speakerLabel: "Interviewer",
-      content: scenarioConfig.initialInterviewerBrief,
+      content: blueprint.initialInterviewerBrief,
       phase: "problem_framing",
       badgeKind: "brief",
       eventSummary: "Brief",
@@ -188,8 +216,8 @@ export const createSession = mutation({
       channelId: teammateChannelId,
       threadId: teammateThreadId,
       speakerType: "teammate",
-      speakerLabel: teammateMeta.name,
-      content: scenarioConfig.initialTeammateMessage,
+      speakerLabel: blueprint.teammateName,
+      content: blueprint.initialTeammateMessage,
       phase: "problem_framing",
       badgeKind: "team",
       eventSummary: "Teammate intro",

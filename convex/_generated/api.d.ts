@@ -23,6 +23,7 @@ import type * as reports from "../reports.js";
 import type * as sessions from "../sessions.js";
 import type * as testing from "../testing.js";
 import type * as testingNode from "../testingNode.js";
+import type * as workspace from "../workspace.js";
 
 import type {
   ApiFromModules,
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   sessions: typeof sessions;
   testing: typeof testing;
   testingNode: typeof testingNode;
+  workspace: typeof workspace;
 }>;
 
 /**

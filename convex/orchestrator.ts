@@ -1,17 +1,31 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { getChannelByKind, getSessionCounters, getSessionState } from "./lib/db";
 import {
+  getChannelByKind,
+  getSessionCounters,
+  getSessionState,
+  getSolutionWorkspace,
+} from "./lib/db";
+import {
+  approvedClarificationValidator,
   channelKindValidator,
   phaseValidator,
   streamingResponseStatusValidator,
 } from "./lib/validators";
 import type { Doc, Id } from "./_generated/dataModel";
+import { parseClarifications } from "../lib/interview-blueprint";
 
 const processingContextValidator = v.object({
   sessionPublicId: v.string(),
   title: v.string(),
   subtitle: v.string(),
+  jobDescription: v.string(),
+  resumeSummary: v.string(),
+  problemStatement: v.string(),
+  sharedContextSeed: v.string(),
+  approvedClarifications: v.array(approvedClarificationValidator),
+  solutionTemplate: v.string(),
+  workingSolution: v.string(),
   mode: v.string(),
   currentPhase: phaseValidator,
   candidateName: v.string(),
@@ -61,6 +75,7 @@ export const getProcessingContext = internalQuery({
     const counterpartChannel = await getChannelByKind(ctx, args.sessionId, counterpartKind);
     const candidateMessage = await ctx.db.get(args.candidateMessageId);
     const sessionState = await getSessionState(ctx, args.sessionId);
+    const solutionWorkspace = await getSolutionWorkspace(ctx, args.sessionId);
     const signals = await ctx.db
       .query("signalState")
       .withIndex("by_sessionId", (query) => query.eq("sessionId", args.sessionId))
@@ -99,6 +114,18 @@ export const getProcessingContext = internalQuery({
       sessionPublicId: session.publicId,
       title: session.title,
       subtitle: session.subtitle,
+      jobDescription: session.jobDescription ?? "",
+      resumeSummary: session.resumeSummary ?? "",
+      problemStatement: session.problemStatement ?? session.title,
+      sharedContextSeed:
+        session.sharedContextSeed ?? sessionState.latestCrossChannelDigest ?? "",
+      approvedClarifications: parseClarifications(session.approvedClarificationsJson ?? ""),
+      solutionTemplate: solutionWorkspace?.template ?? session.solutionTemplate ?? "",
+      workingSolution:
+        solutionWorkspace?.finalContent ??
+        solutionWorkspace?.draftContent ??
+        session.solutionTemplate ??
+        "",
       mode: session.mode,
       currentPhase: session.currentPhase,
       candidateName: session.candidateName,
@@ -280,7 +307,10 @@ export const persistGeneratedResponse = internalMutation({
         type: "teammate_concern_raised",
         actor: "teammate",
         target: "candidate",
-        metadataJson: JSON.stringify({ summary: args.eventSummary }),
+        metadataJson: JSON.stringify({
+          summary: args.eventSummary,
+          teammateName: session.teammateName,
+        }),
         createdAt: now,
       });
     }
