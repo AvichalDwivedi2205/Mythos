@@ -14,12 +14,14 @@
     "test:unit": "vitest run",
     "test:convex": "vitest run tests/convex",
     "test:ai": "tsx tests/ai/ai-smoke.ts",
+    "verify:openrouter": "tsx tests/ai/verify-openrouter.ts",
     "test:e2e": "playwright test",
     "test": "bun run test:unit && bun run test:convex && bun run test:ai",
     "test:full": "bun run convex:sync && bun run typecheck && bun run test:unit && bun run test:convex && bun run build && bun run test:ai && bun run test:e2e"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.62",
+    "@ai-sdk/openai": "^3.0.52",
     "@convex-dev/agent": "^0.6.1",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/workpool": "^0.4.6",

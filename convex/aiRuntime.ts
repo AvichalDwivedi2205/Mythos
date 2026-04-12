@@ -2,17 +2,13 @@
 
 import { Agent, type AgentComponent, type UsageHandler } from "@convex-dev/agent";
 import { generateObject } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { components, internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
+import { getInterviewLanguageModel } from "./lib/llmProvider";
 import { getClarificationAnswer } from "./lib/scenario";
 import { reportSchema, turnAnalysisSchema, visibleAgentResponseSchema } from "./lib/aiSchemas";
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
-
-const model = google("gemini-3.1-flash-lite-preview");
+const model = getInterviewLanguageModel();
 const agentComponent = components.agent as unknown as AgentComponent;
 
 const usageHandler: UsageHandler = async (

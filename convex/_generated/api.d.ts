@@ -13,6 +13,7 @@ import type * as channels from "../channels.js";
 import type * as checkIns from "../checkIns.js";
 import type * as lib_aiSchemas from "../lib/aiSchemas.js";
 import type * as lib_db from "../lib/db.js";
+import type * as lib_llmProvider from "../lib/llmProvider.js";
 import type * as lib_scenario from "../lib/scenario.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as notes from "../notes.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   checkIns: typeof checkIns;
   "lib/aiSchemas": typeof lib_aiSchemas;
   "lib/db": typeof lib_db;
+  "lib/llmProvider": typeof lib_llmProvider;
   "lib/scenario": typeof lib_scenario;
   "lib/validators": typeof lib_validators;
   notes: typeof notes;
