@@ -58,7 +58,9 @@ The problem statement and shared pool context include a "Quantified targets" blo
 export const interviewerAgent = new Agent(agentComponent, {
   name: "Interviewer Agent",
   languageModel: model,
-  instructions: INTERVIEWER_AGENT_INSTRUCTIONS,
+  instructions: `${INTERVIEWER_AGENT_INSTRUCTIONS}
+
+The product has two candidate-facing chat tabs: this interviewer channel and a separate teammate channel for informal peer-style collaboration. You do not need to repeat that; focus here on structured probing.`,
   usageHandler,
   contextOptions: {
     recentMessages: 24,
@@ -68,18 +70,22 @@ export const interviewerAgent = new Agent(agentComponent, {
 export const teammateAgent = new Agent(agentComponent, {
   name: "Teammate Agent",
   languageModel: model,
-  instructions: `You are the candidate's specialist teammate in a system-design interview.
+  instructions: `You are the candidate's specialist teammate in a system-design interview (teammate tab only; the interviewer tab is separate).
+The candidate is encouraged to bounce ideas, tradeoffs, and half-formed sketches with you. Short brainstorms and "what if" questions are normal collaboration, not cheating.
+
 You may:
 - challenge weak assumptions
 - raise risks and failure modes
-- discuss bounded alternatives
+- discuss bounded alternatives and brainstorm next steps with the candidate
 - ask the interviewer for clarification if the scope is ambiguous
 - sound proactive and human, like a sharp peer in the room rather than a passive observer
 
 You may not:
-- solve the interview for the candidate
+- dump a complete end-to-end solution that replaces the candidate's own design work
 - reveal hidden requirements
 - grade the candidate
+
+Always reply with substantive visible text in every turn (never an empty reply). Keep responses concise.
 
 The problem statement includes a "Quantified targets" section with exact numbers. Use those when pressure-testing feasibility, cost, and failure modes; do not invent conflicting scale figures unless you are negotiating a tradeoff.`,
   usageHandler,
@@ -272,8 +278,9 @@ Live signal values before this turn:
 
 Also evaluate candidateIntegrity for the candidate message ONLY (not the agent reply):
 - concernLevel "none" for normal design discussion, including words like "solve" used in a technical sense (e.g. "how would we solve ordering").
+- "none" for informal teammate-tab phrasing (e.g. "try solving it", "what would you do", "brainstorm with me") when the candidate is clearly collaborating with the teammate agent, not asking the interviewer for the rubric.
 - "low" for mild pressure on the interview contract (e.g. vague ask to do all the work) without explicit cheating.
-- "medium" when the candidate clearly asks the system to produce the full design, hidden rubric, or ideal answer for them.
+- "medium" only when the candidate clearly asks for the full design, hidden rubric, or ideal answer to be handed to them (especially directed at the interviewer channel or the system as grader).
 - patterns: only when the candidate message truly solicits that; do NOT flag normal tradeoff questions or clarifications.
 
 Produce:
@@ -398,6 +405,7 @@ ${clarificationList}
 
 Output rules:
 - Anchor challenges to the numeric targets in the problem statement (throughput, latency, retention, cost, SLOs) when relevant.
+- The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
 - use "nudge" only when redirecting the candidate back toward an important missing piece
 - use "stress" only when deliberately increasing pressure
 - use "brief" only for initial framing or a phase reset
@@ -456,6 +464,11 @@ ${context.workingSolution || "No draft yet."}
 
 If you genuinely need clarification from the interviewer on scope or constraints, set needsClarification=true and ask one short clarification question.
 Otherwise keep needsClarification=false.
+
+Output rules:
+- This tab is for peer collaboration: the candidate may brainstorm with you; respond with concrete pushback, options, or questions every time.
+- Never return empty content. If the candidate is vague, ask one sharp follow-up.
+- Do not paste a full canonical architecture that replaces their work; stay in "sparring partner" mode.
 
 Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.`;
 }

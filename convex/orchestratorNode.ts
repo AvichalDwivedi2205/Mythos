@@ -33,9 +33,12 @@ export const processCandidateTurn = internalAction({
         onPartialContent: streamingEnabled
           ? async (content: string) => {
               const now = Date.now();
+              const delta = content.length - lastFlushedContent.length;
               const shouldFlush =
                 content.length > 0 &&
-                (content.length - lastFlushedContent.length >= 32 || now - lastFlushAt >= 150);
+                (lastFlushedContent.length === 0 ||
+                  delta >= 16 ||
+                  now - lastFlushAt >= 120);
 
               if (!shouldFlush || content === lastFlushedContent) {
                 return;
@@ -80,17 +83,24 @@ export const processCandidateTurn = internalAction({
         clarificationQuestion: response.clarificationQuestion,
       });
 
-      const analysis = await generateTurnAnalysis(context, {
-        responseContent: response.content,
-        responseBadgeKind: response.badgeKind,
-      });
+      try {
+        const analysis = await generateTurnAnalysis(context, {
+          responseContent: response.content,
+          responseBadgeKind: response.badgeKind,
+        });
 
-      await ctx.runMutation(internal.orchestrator.applyTurnAnalysis, {
-        sessionId: args.sessionId,
-        candidateMessageId: args.candidateMessageId,
-        responseMessageId: persisted.responseMessageId,
-        analysisJson: JSON.stringify(analysis),
-      });
+        await ctx.runMutation(internal.orchestrator.applyTurnAnalysis, {
+          sessionId: args.sessionId,
+          candidateMessageId: args.candidateMessageId,
+          responseMessageId: persisted.responseMessageId,
+          analysisJson: JSON.stringify(analysis),
+        });
+      } catch (analysisError) {
+        console.error(
+          `[processCandidateTurn] Turn analysis failed after visible reply persisted (${args.channelKind}):`,
+          analysisError,
+        );
+      }
 
       return null;
     } catch (error) {

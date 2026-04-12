@@ -423,7 +423,7 @@ export const markResponseGenerationFailed = internalMutation({
 
     if (runtime) {
       await ctx.db.patch(runtime._id, {
-        status: "blocked",
+        status: "idle",
         lastHeartbeatAt: now,
       });
     }

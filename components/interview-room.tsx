@@ -174,12 +174,6 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   const saveSolutionDraft = useMutation(api.workspace.saveSolutionDraft);
   const submitFinalSolution = useMutation(api.workspace.submitFinalSolution);
 
-  const aiGuardrailNotice = useMemo(() => {
-    return (
-      workspace?.notifications?.find((entry) => entry.type === "integrity_warning") ?? null
-    );
-  }, [workspace?.notifications]);
-
   useEffect(() => {
     if (sessionStatus?.sessionStatus === "completed") {
       router.prefetch(`/reports/${sessionPublicId}`);
@@ -799,8 +793,8 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
               <div className="sysln">
                 <span>
                   {activeTab === "interviewer"
-                    ? `Interviewer channel · ${formatModeLabel(room.mode)} mode · Rubric ${room.rubricVersion}`
-                    : `${teammateName} · ${room.channels[1]?.specialization ?? teammateMeta.label} · Teammate channel`}
+                    ? `Interviewer channel · ${formatModeLabel(room.mode)} mode · Rubric ${room.rubricVersion} · Use the teammate tab to brainstorm tradeoffs with your specialist peer.`
+                    : `${teammateName} · ${room.channels[1]?.specialization ?? teammateMeta.label} · Teammate channel · Bounce ideas and risks here; switch to Interviewer for formal probes.`}
                 </span>
               </div>
 
@@ -842,25 +836,6 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             <div
               className={`inpa composer composer--${activeTab === "interviewer" ? "interviewer" : "teammate"}`}
             >
-              {aiGuardrailNotice ? (
-                <div
-                  className="mev"
-                  style={{
-                    marginBottom: 10,
-                    background: "rgba(251, 191, 36, 0.12)",
-                    borderColor: "rgba(251, 191, 36, 0.35)",
-                    color: "var(--amber)",
-                  }}
-                >
-                  <span className="edot" style={{ background: "var(--amber)" }} />
-                  <div>
-                    <strong>{aiGuardrailNotice.title}</strong>
-                    <div style={{ marginTop: 4, fontSize: 13, opacity: 0.95 }}>
-                      {aiGuardrailNotice.detail}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
               <div className="inpr">
                 <textarea
                   className={`inp inp--${activeTab === "interviewer" ? "interviewer" : "teammate"}`}
