@@ -7,4 +7,4 @@ export const INTERVIEW_JOB_DESCRIPTION =
   typeof process.env.NEXT_PUBLIC_INTERVIEW_JOB_DESCRIPTION === "string" &&
   process.env.NEXT_PUBLIC_INTERVIEW_JOB_DESCRIPTION.trim().length > 0
     ? process.env.NEXT_PUBLIC_INTERVIEW_JOB_DESCRIPTION.trim()
-    : "Senior backend engineer — distributed systems, real-time messaging, and reliability at scale.";
+    : "Senior backend engineer: distributed systems, real-time messaging, and reliability at scale.";

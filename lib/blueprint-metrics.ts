@@ -38,10 +38,10 @@ const MESSAGING_PRESETS: [MetricPreset, MetricPreset, MetricPreset] = [
       "Send acknowledgement (client → durable commit): p99 ≤ 240 ms under normal load; p99 ≤ 800 ms during regional stress.",
       "Groups: up to 500 members; a single conversation shard must sustain ≥ 12k messages/sec without starving 1:1 traffic on the same pool.",
       "Offline queue: 7 days retention; max gap-fill replay window per device session ≤ 15 minutes after reconnect.",
-      "Viral burst: writes may spike 20× in 90 seconds — capacity must absorb without shedding durable writes.",
+      "Viral burst: writes may spike 20× in 90 seconds; capacity must absorb without shedding durable writes.",
     ],
     stressIncident:
-      "Region flapping: shard leadership churns 8–12 times in 2 minutes; broker p99 latency 120 ms → 1.1 s; duplicate delivery attempts rise from 0.02% to 0.6%.",
+      "Region flapping: shard leadership churns 8-12 times in 2 minutes; broker p99 latency 120 ms → 1.1 s; duplicate delivery attempts rise from 0.02% to 0.6%.",
   },
   {
     lines: [
@@ -170,7 +170,7 @@ const MARKETPLACE_PRESETS: [MetricPreset, MetricPreset, MetricPreset] = [
     lines: [
       "Checkout confirmation: p99 ≤ 3.0 s; timeout hard 8 s.",
       "Peak: 12,000 orders/min per region; 2× on campaign days.",
-      "Inventory sync latency from sellers: 15–60 s typical; reconciliation job every 5 min.",
+      "Inventory sync latency from sellers: 15-60 s typical; reconciliation job every 5 min.",
     ],
     stressIncident:
       "Warehouse feed lag 8 s → 6 min; oversell risk window: 0.4% of SKUs; compensation queue 14k orders.",

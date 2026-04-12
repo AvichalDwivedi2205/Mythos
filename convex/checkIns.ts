@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
 import { getSessionCounters, getChannelByKind } from "./lib/db";
+import { computeTimedPhaseFromSession } from "../lib/timed-phase";
 
 const CHECK_IN_INTERVAL_MS = 3 * 60 * 1000;
 
@@ -49,10 +50,13 @@ export const applyInterviewerCheckIn = internalMutation({
 
     const sequence = counters.nextSequence + 1;
     const now = Date.now();
-    const phase = session.currentPhase;
+    const phase = computeTimedPhaseFromSession(session.startedAt, session.timeBudgetMs, now);
+    if (session.currentPhase !== phase) {
+      await ctx.db.patch(session._id, { currentPhase: phase });
+    }
 
     const lines = [
-      "Quick check-in from the interviewer — still with me?",
+      "Quick check-in from the interviewer. Still with me?",
       `We're in the ${phase.replace(/_/g, " ")} phase. What's the clearest gap or risk on your mind right now?`,
     ];
     const content = lines.join("\n\n");
@@ -87,7 +91,7 @@ export const applyInterviewerCheckIn = internalMutation({
       target: "candidate",
       metadataJson: JSON.stringify({
         title: "Interviewer check-in",
-        detail: "A timed room pulse — respond when you can.",
+        detail: "A timed room pulse; respond when you can.",
       }),
       createdAt: now,
     });

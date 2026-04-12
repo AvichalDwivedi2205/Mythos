@@ -463,7 +463,7 @@ const MESSAGING_DEEP_VARIANTS: Array<{
       "You must quantify ordering scope (per chat vs global) and defend the choice.",
     ],
     stress:
-      "A viral burst multiplies writes ~20× in 90 seconds while one region’s shard leadership flaps — show how you detect it, shed load, and avoid double delivery.",
+      "A viral burst multiplies writes ~20× in 90 seconds while one region’s shard leadership flaps. Show how you detect it, shed load, and avoid double delivery.",
     checklist: [
       "State 3 measurable SLAs before drawing components.",
       "Trace one cross-region send with IDs, ordering, and retries end-to-end.",
@@ -483,7 +483,7 @@ const MESSAGING_DEEP_VARIANTS: Array<{
       "Call out how you prevent abusive clients from pinning hot keys indefinitely.",
     ],
     stress:
-      "A deploy pushes a bad serialization schema while a campaign drives a 50× burst — walk through detection, rollback, and safe replay.",
+      "A deploy pushes a bad serialization schema while a campaign drives a 50× burst. Walk through detection, rollback, and safe replay.",
     checklist: [
       "Draw data flow for send vs search with different storage systems if needed.",
       "Explain idempotency keys for at-least-once delivery.",
@@ -493,7 +493,7 @@ const MESSAGING_DEEP_VARIANTS: Array<{
   {
     title: "Regional Messaging Mesh",
     problemLead:
-      "Users expect low latency in-region with eventual convergence across regions — not a single global choke point.",
+      "Users expect low latency in-region with eventual convergence across regions, not a single global choke point.",
     objectiveAddon:
       "Partition ownership, leader election boundaries, and failover drills are first-class in your story.",
     constraints: [
@@ -503,7 +503,7 @@ const MESSAGING_DEEP_VARIANTS: Array<{
       "Describe how you migrate traffic between cells without mass client reconnect storms.",
     ],
     stress:
-      "Half of a region’s brokers restart during peak — show how clients and routers rebalance without stampeding metadata stores.",
+      "Half of a region’s brokers restart during peak. Show how clients and routers rebalance without stampeding metadata stores.",
     checklist: [
       "List failure domains (AZ, region, global control plane) and blast radius for each.",
       "Give a concrete leader election or ownership story for at least one shard type.",
@@ -518,12 +518,12 @@ const MESSAGING_DEEP_VARIANTS: Array<{
       "Client protocol design (reconnect, resume tokens, gap fill) matters as much as server scale.",
     constraints: [
       "Mobile clients may stay offline for days; replay must be bounded and user-visible.",
-      "Battery and data usage constrain push/pull frequency — justify your strategy.",
+      "Battery and data usage constrain push/pull frequency. Justify your strategy.",
       "WebSockets vs long polling vs QUIC: pick and defend for your assumed client mix.",
       "Security: token binding, device revocation, and abuse on connection storms.",
     ],
     stress:
-      "A client bug causes reconnect loops that amplify write QPS — how does the edge protect the core?",
+      "A client bug causes reconnect loops that amplify write QPS. How does the edge protect the core?",
     checklist: [
       "Sketch client session state machine for connect / resume / gap recovery.",
       "Explain how you cap per-device connection churn.",
@@ -561,7 +561,7 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
       mv.title,
       `${mv.problemLead} ${track.objective}`,
       ...(mv.objectiveAddon ? [mv.objectiveAddon] : []),
-      `Quantified targets (canonical — use these exact figures in discussion):\n${metricsBlock}`,
+      `Quantified targets (canonical; use these exact figures in discussion):\n${metricsBlock}`,
       `Requirements:\n${constraintBlock}`,
       `Failure scenario to stress-test the design:\n${stressScenario}`,
     ].join("\n\n");
@@ -600,7 +600,7 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
   const interviewerBrief = [
     track.title,
     track.objective,
-    `Quantified targets (canonical — use these exact figures in discussion):\n${metricsBlock}`,
+    `Quantified targets (canonical; use these exact figures in discussion):\n${metricsBlock}`,
     `Design focus:\n${constraintBlock}`,
     `Failure scenario:\n${stressScenario}`,
   ].join("\n\n");
@@ -618,7 +618,7 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
   };
 }
 
-/** Deterministic variety per session — use public session id or similar. */
+/** Deterministic variety per session; use public session id or similar. */
 export function buildInterviewBlueprint(args: {
   candidateName: string;
   jobDescription: string;

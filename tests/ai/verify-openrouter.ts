@@ -67,7 +67,7 @@ async function main() {
         {
           ok: true,
           skipped: true,
-          reason: "OPENROUTER_API_KEY not set — set it to run live OpenRouter verification.",
+          reason: "OPENROUTER_API_KEY not set; set it to run live OpenRouter verification.",
         },
         null,
         2,

@@ -70,7 +70,7 @@ export function ReportPage({ sessionPublicId }: { sessionPublicId: string }) {
               </div>
             </div>
             <div className="msgs" style={{ alignItems: "center", justifyContent: "center" }}>
-              <div className="sysln"><span>Pulling report from Convex — hang tight</span></div>
+              <div className="sysln"><span>Pulling report from Convex; hang tight</span></div>
             </div>
           </section>
         </div>
@@ -147,7 +147,7 @@ export function ReportPage({ sessionPublicId }: { sessionPublicId: string }) {
             </div>
             <div className="msgs">
               <div className="sysln">
-                <span>Session {sessionPublicId} · Building evaluation — check back in a moment</span>
+                <span>Session {sessionPublicId} · Building evaluation; check back in a moment</span>
               </div>
             </div>
           </section>

@@ -398,11 +398,11 @@ html,body{height:100%;overflow:hidden;font-family:'Outfit',sans-serif;background
 
       <div class="msg">
         <div class="mhd"><span class="spk sc">You</span><span class="mt">01:40</span></div>
-        <div class="bub bc">Are we supporting DMs only, or group chats as well? What's the ordering requirement — strong per-conversation or eventual? And do we need offline delivery?</div>
+        <div class="bub bc">Are we supporting DMs only, or group chats as well? What's the ordering requirement: strong per-conversation or eventual? And do we need offline delivery?</div>
       </div>
       <div class="msg">
         <div class="mhd"><span class="spk si">Interviewer</span><span class="mt">02:55</span></div>
-        <div class="bub bi">Both DMs and groups — up to 500 members per group. Strong ordering within each conversation is required. Offline delivery within a 7-day window.</div>
+        <div class="bub bi">Both DMs and groups: up to 500 members per group. Strong ordering within each conversation is required. Offline delivery within a 7-day window.</div>
       </div>
       <div class="msg">
         <div class="mhd"><span class="spk sc">You</span><span class="mt">03:20</span></div>
@@ -410,18 +410,18 @@ html,body{height:100%;overflow:hidden;font-family:'Outfit',sans-serif;background
       </div>
       <div class="msg">
         <div class="mhd"><span class="spk si">Interviewer</span><span class="mt">03:45</span></div>
-        <div class="bub bi">Presence yes. Read receipt delivery can be best-effort — don't over-engineer that.</div>
+        <div class="bub bi">Presence yes. Read receipt delivery can be best-effort; don't over-engineer that.</div>
       </div>
 
       <div class="phdiv">High-Level Design</div>
 
       <div class="msg">
         <div class="mhd"><span class="spk sc">You</span><span class="mt">09:50</span></div>
-        <div class="bub bc">After working through the routing concern with Priya — WebSocket gateway with consistent hashing, Kafka for cross-node fan-out partitioned by user ID, Cassandra for message storage. Still finalising the ordering scheme.</div>
+        <div class="bub bc">After working through the routing concern with Priya: WebSocket gateway with consistent hashing, Kafka for cross-node fan-out partitioned by user ID, Cassandra for message storage. Still finalising the ordering scheme.</div>
       </div>
       <div class="msg">
         <div class="mhd"><span class="spk si">Interviewer</span><span class="mbg bg-nudge">Nudge</span><span class="mt">10:10</span></div>
-        <div class="bub bi bnudge">You've described the delivery path well. But storage ordering is still open — you said strong ordering is required. How does Cassandra give you that, and what's your message ID strategy?</div>
+        <div class="bub bi bnudge">You've described the delivery path well. But storage ordering is still open; you said strong ordering is required. How does Cassandra give you that, and what's your message ID strategy?</div>
         <div class="mev"><div class="edot" style="background:var(--amber)"></div>Nudge · storage ordering not yet addressed</div>
       </div>
 
@@ -453,16 +453,16 @@ html,body{height:100%;overflow:hidden;font-family:'Outfit',sans-serif;background
       </div>
       <div class="msg">
         <div class="mhd"><span class="spk st">Priya</span><span class="mbg bg-team">SRE</span><span class="mt">07:02</span></div>
-        <div class="bub bt">Pushing on the WebSocket gateway — at 10M concurrent, each node handles maybe 100–150k realistically. You're at 70–100 gateway nodes minimum. What's your strategy for routing when a user reconnects, or when sender and receiver land on different nodes?</div>
+        <div class="bub bt">Pushing on the WebSocket gateway: at 10M concurrent, each node handles maybe 100-150k realistically. You're at 70-100 gateway nodes minimum. What's your strategy for routing when a user reconnects, or when sender and receiver land on different nodes?</div>
         <div class="mev"><div class="edot" style="background:var(--blue)"></div>Concern raised · cross-node routing</div>
       </div>
       <div class="msg">
         <div class="mhd"><span class="spk sc">You</span><span class="mt">08:55</span></div>
-        <div class="bub bc">Consistent hashing at the load balancer keyed to user ID — routes to a stable gateway. For cross-node: each gateway subscribes to Kafka topics by user ID. Message from gateway-3 destined for gateway-7 goes via Kafka. Reconnects rehash to the same node.</div>
+        <div class="bub bc">Consistent hashing at the load balancer keyed to user ID; routes to a stable gateway. For cross-node: each gateway subscribes to Kafka topics by user ID. Message from gateway-3 destined for gateway-7 goes via Kafka. Reconnects rehash to the same node.</div>
       </div>
       <div class="msg">
         <div class="mhd"><span class="spk st">Priya</span><span class="mbg bg-team">SRE</span><span class="mt">09:30</span></div>
-        <div class="bub bt">That routing holds up. One concern though — Kafka partition rebalancing during a leader failure could cause a 2–3s delivery gap. How do you handle messages in-flight during that window without introducing duplicates?</div>
+        <div class="bub bt">That routing holds up. One concern though: Kafka partition rebalancing during a leader failure could cause a 2-3s delivery gap. How do you handle messages in-flight during that window without introducing duplicates?</div>
         <div class="mev"><div class="edot" style="background:var(--blue)"></div>Concern raised · Kafka partition failover</div>
       </div>
 
@@ -505,7 +505,7 @@ html,body{height:100%;overflow:hidden;font-family:'Outfit',sans-serif;background
     </div>
     <div class="sticky" style="background:#bfdbfe">
       <div class="shd"><div class="slbl">Open question</div><button class="scls" onclick="rmN(this)">✕</button></div>
-      <textarea class="sta" placeholder="Note…">Message ID scheme — ULID? Snowflake? Needed for Cassandra ordering</textarea>
+      <textarea class="sta" placeholder="Note…">Message ID scheme: ULID? Snowflake? Needed for Cassandra ordering</textarea>
     </div>
   </div>
 </aside>
@@ -560,15 +560,15 @@ function ah(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,96)+
 function esc(s){return s.replace(/[<>]/g,c=>c==='<'?'&lt;':'&gt;')}
 
 const IR=[
-  "Good. Walk me through your message ID strategy — how do you guarantee ordering within Cassandra?",
-  "That handles ordering. What happens if a Kafka partition leader fails mid-fanout — how do you recover without duplicates or missed messages?",
-  "Let's stress this. Traffic spikes 20x in 90 seconds — viral event. What breaks first in your current architecture?",
+  "Good. Walk me through your message ID strategy: how do you guarantee ordering within Cassandra?",
+  "That handles ordering. What happens if a Kafka partition leader fails mid-fanout: how do you recover without duplicates or missed messages?",
+  "Let's stress this. Traffic spikes 20x in 90 seconds: viral event. What breaks first in your current architecture?",
   "Good recovery. Final question: how do you handle cross-region consistency for group messages across two active regions?",
 ];
 const TR=[
-  "Idempotency keys on the producer side makes sense for deduplication. But what about consumers — how does a gateway know it's already delivered a message it's seeing replayed?",
+  "Idempotency keys on the producer side makes sense for deduplication. But what about consumers: how does a gateway know it's already delivered a message it's seeing replayed?",
   "At 500-member groups, fan-out from a single Kafka consumer to 500 WebSocket connections is expensive. Have you considered offloading group fan-out to a dedicated service?",
-  "The fan-out service works. For presence at this scale though — Redis pub/sub could bottleneck under a spike. What's your degraded-mode strategy if presence becomes unavailable?",
+  "The fan-out service works. For presence at this scale though: Redis pub/sub could bottleneck under a spike. What's your degraded-mode strategy if presence becomes unavailable?",
 ];
 let iIdx=0,tIdx=0;
 

@@ -16,6 +16,7 @@ import {
 } from "./lib/validators";
 import { createPublicId } from "../lib/utils";
 import { DEFAULT_TIME_BUDGET_MS } from "../lib/constants";
+import { computeTimedPhaseFromSession } from "../lib/timed-phase";
 import { buildInterviewBlueprint, serializeClarifications } from "../lib/interview-blueprint";
 
 export const createSession = mutation({
@@ -293,7 +294,11 @@ export const getRoom = query({
       candidateName: session.candidateName,
       mode: session.mode,
       status: session.status,
-      currentPhase: session.currentPhase,
+      currentPhase: computeTimedPhaseFromSession(
+        session.startedAt,
+        session.timeBudgetMs,
+        Date.now(),
+      ),
       startedAt: session.startedAt,
       timeBudgetMs: session.timeBudgetMs,
       rubricVersion: session.rubricVersion,

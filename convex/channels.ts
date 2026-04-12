@@ -3,6 +3,7 @@ import { components, internal } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
 import { RateLimiter, MINUTE } from "@convex-dev/rate-limiter";
 import { getChannelByKind, getSessionByPublicId, getSessionCounters } from "./lib/db";
+import { computeTimedPhaseFromSession } from "../lib/timed-phase";
 import {
   sendCandidateMessageResultValidator,
   streamingResponseValidator,
@@ -102,6 +103,10 @@ export const sendCandidateMessage = mutation({
 
     const sequence = counters.nextSequence + 1;
     const now = Date.now();
+    const phaseNow = computeTimedPhaseFromSession(session.startedAt, session.timeBudgetMs, now);
+    if (session.currentPhase !== phaseNow) {
+      await ctx.db.patch(session._id, { currentPhase: phaseNow });
+    }
 
     const messageId = await ctx.db.insert("messages", {
       sessionId: session._id,
@@ -111,7 +116,7 @@ export const sendCandidateMessage = mutation({
       speakerType: "candidate",
       speakerLabel: "You",
       content,
-      phase: session.currentPhase,
+      phase: phaseNow,
       badgeKind: null,
       eventSummary: null,
       createdAt: now,

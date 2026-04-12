@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { PHASES, TEAMMATE_SPECIALIZATIONS, type InterviewPhase } from "@/lib/constants";
+import { computeTimedPhaseFromSession } from "@/lib/timed-phase";
 import { formatPhaseLabel, formatSessionElapsed, formatTimer } from "@/lib/utils";
 import { ShellTopbar } from "./shell-topbar";
 import { SolutionMarkdownEditor } from "./solution-markdown-editor";
@@ -558,7 +559,8 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     );
   }
 
-  const phaseNum = PHASES.indexOf(room.currentPhase) + 1;
+  const displayPhase = computeTimedPhaseFromSession(room.startedAt, room.timeBudgetMs, now);
+  const phaseNum = PHASES.indexOf(displayPhase) + 1;
   const teammateName = room.channels[1]?.agentRole ?? "Teammate";
   const teammateTabLabel = `${teammateName} · ${teammateMeta.shortLabel}`;
 
@@ -596,7 +598,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             </div>
             <div className="phases">
               {PHASES.map((phase) => (
-                <div key={phase} className={`ph ${getPhaseState(room.currentPhase, phase)}`}>
+                <div key={phase} className={`ph ${getPhaseState(displayPhase, phase)}`}>
                   <div className="pip" />
                   <span className="phn">{formatPhaseLabel(phase)}</span>
                 </div>
@@ -756,7 +758,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             </div>
             <div className="pchip">
               <span className="pcdot" />
-              Phase {phaseNum} · {formatPhaseLabel(room.currentPhase)}
+              Phase {phaseNum} · {formatPhaseLabel(displayPhase)}
             </div>
             <button className="endbtn" onClick={onEndSession} disabled={isEnding} type="button">
               {isEnding ? "Ending…" : "End Session"}
@@ -1151,7 +1153,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                 variant="fullscreen"
                 value={solutionDraft}
                 onChange={setSolutionDraft}
-                placeholder="Write your full design write-up — headings, lists, code fences. Autosaves."
+                placeholder="Write your full design write-up: headings, lists, code fences. Autosaves."
               />
             </div>
             <div className="solution-expand-panel__ft">

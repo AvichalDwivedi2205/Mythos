@@ -338,7 +338,7 @@ export function StartInterviewPage() {
               <div className="inpr">
                 <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 12, color: "var(--txt2)" }}>
-                    Candidate: <strong style={{ color: "var(--txt)" }}>{candidateName || "—"}</strong>
+                    Candidate: <strong style={{ color: "var(--txt)" }}>{candidateName || "-"}</strong>
                     {" · "}Mode:{" "}
                     <strong style={{ color: "var(--sage)" }}>{modeCopy[mode].short}</strong>
                     {" · "}Teammate:{" "}
@@ -415,7 +415,7 @@ export function StartInterviewPage() {
                 className="sta"
                 style={{ minHeight: "auto", resize: "none", userSelect: "text" }}
               >
-                {modeCopy[mode].short} — {modeCopy[mode].detail}
+                {modeCopy[mode].short}: {modeCopy[mode].detail}
               </div>
             </div>
 

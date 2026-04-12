@@ -203,7 +203,7 @@ button {
   overflow: hidden;
 }
 
-/* App chrome (start / report — mirrors interview ctop) */
+/* App chrome (start / report; mirrors interview ctop) */
 .shell-topbar {
   display: flex;
   align-items: center;

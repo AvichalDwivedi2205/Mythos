@@ -32,7 +32,7 @@ export const aiSmokeTest = action({
       sessionPublicId: "test-session",
       title: "Real-Time Chat at Scale",
       subtitle: "System Design · Senior Engineer",
-      jobDescription: "Senior backend — real-time messaging and presence.",
+      jobDescription: "Senior backend: real-time messaging and presence.",
       resumeSummary: "Prior experience with distributed systems and chat backends.",
       problemStatement: "Design a global messaging platform with ordering and offline delivery.",
       sharedContextSeed: "Candidate background: distributed systems. Job focus: messaging.",

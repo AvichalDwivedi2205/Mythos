@@ -14,6 +14,7 @@ import {
 } from "./lib/validators";
 import type { Doc, Id } from "./_generated/dataModel";
 import { parseClarifications } from "../lib/interview-blueprint";
+import { computeTimedPhaseFromSession } from "../lib/timed-phase";
 
 const processingContextValidator = v.object({
   sessionPublicId: v.string(),
@@ -110,6 +111,12 @@ export const getProcessingContext = internalQuery({
       .map((note) => `- [${note.label}] ${note.content}`)
       .join("\n");
 
+    const phaseNow = computeTimedPhaseFromSession(
+      session.startedAt,
+      session.timeBudgetMs,
+      Date.now(),
+    );
+
     return {
       sessionPublicId: session.publicId,
       title: session.title,
@@ -127,7 +134,7 @@ export const getProcessingContext = internalQuery({
         session.solutionTemplate ??
         "",
       mode: session.mode,
-      currentPhase: session.currentPhase,
+      currentPhase: phaseNow,
       candidateName: session.candidateName,
       teammateName: session.teammateName,
       teammateSpecialization: session.teammateSpecialization,
@@ -192,6 +199,11 @@ export const persistGeneratedResponse = internalMutation({
     }
 
     const now = Date.now();
+    const phaseNow = computeTimedPhaseFromSession(session.startedAt, session.timeBudgetMs, now);
+    if (session.currentPhase !== phaseNow) {
+      await ctx.db.patch(session._id, { currentPhase: phaseNow });
+    }
+
     const sequence = counters.nextSequence + 1;
     const speakerType = args.channelKind === "interviewer" ? "interviewer" : "teammate";
     const speakerLabel = args.channelKind === "interviewer" ? "Interviewer" : session.teammateName;
@@ -204,7 +216,7 @@ export const persistGeneratedResponse = internalMutation({
       speakerType,
       speakerLabel,
       content: args.responseContent,
-      phase: session.currentPhase,
+      phase: phaseNow,
       badgeKind: args.badgeKind,
       eventSummary: args.eventSummary,
       createdAt: now,
@@ -335,32 +347,6 @@ export const persistGeneratedResponse = internalMutation({
         target: "teammate",
         metadataJson: JSON.stringify({ question: args.clarificationQuestion }),
         createdAt: now,
-      });
-    }
-
-    if (args.shouldAdvancePhase && args.nextPhase && args.nextPhase !== session.currentPhase) {
-      await ctx.db.patch(session._id, {
-        currentPhase: args.nextPhase,
-      });
-      await ctx.db.insert("events", {
-        sessionId: args.sessionId,
-        channelId: args.channelId,
-        messageId: responseMessageId,
-        type: "phase_completed",
-        actor: "system",
-        target: args.nextPhase,
-        metadataJson: JSON.stringify({
-          from: session.currentPhase,
-          to: args.nextPhase,
-        }),
-        createdAt: now,
-      });
-      await ctx.db.insert("phaseSummaries", {
-        sessionId: args.sessionId,
-        phase: args.nextPhase,
-        summary: `Entered ${args.nextPhase}.`,
-        startedAt: now,
-        endedAt: null,
       });
     }
 
