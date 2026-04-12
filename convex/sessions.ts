@@ -15,6 +15,7 @@ import {
   sessionStatusValidator,
 } from "./lib/validators";
 import { createPublicId } from "../lib/utils";
+import { DEFAULT_TIME_BUDGET_MS } from "../lib/constants";
 import { buildInterviewBlueprint, serializeClarifications } from "../lib/interview-blueprint";
 
 export const createSession = mutation({
@@ -40,6 +41,7 @@ export const createSession = mutation({
       resumeSummary: args.resumeSummary,
       resumeText: args.resumeText,
       teammateSpecializationOverride: args.teammateSpecialization ?? null,
+      sessionEntropy: publicId,
     });
 
     const sessionId = await ctx.db.insert("sessions", {
@@ -53,7 +55,7 @@ export const createSession = mutation({
       title: blueprint.title,
       subtitle: blueprint.subtitle,
       currentPhase: "problem_framing",
-      timeBudgetMs: 60 * 60 * 1000,
+      timeBudgetMs: DEFAULT_TIME_BUDGET_MS,
       startedAt: now,
       endedAt: null,
       interviewerChannelId: null,

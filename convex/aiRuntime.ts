@@ -269,11 +269,18 @@ Live signal values before this turn:
 - Collaboration: ${context.signals.collaborationScore}
 - Nudges: ${context.signals.nudgesGiven}
 
+Also evaluate candidateIntegrity for the candidate message ONLY (not the agent reply):
+- concernLevel "none" for normal design discussion, including words like "solve" used in a technical sense (e.g. "how would we solve ordering").
+- "low" for mild pressure on the interview contract (e.g. vague ask to do all the work) without explicit cheating.
+- "medium" when the candidate clearly asks the system to produce the full design, hidden rubric, or ideal answer for them.
+- patterns: only when the candidate message truly solicits that; do NOT flag normal tradeoff questions or clarifications.
+
 Produce:
 - concise updated summaries
 - extracted structured facts
 - annotations with short excerpts and rationale
 - updated live signals
+- candidateIntegrity as specified
 
 Do not mention hidden chain-of-thought.`;
 

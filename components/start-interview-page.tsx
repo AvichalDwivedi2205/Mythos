@@ -44,6 +44,7 @@ export function StartInterviewPage() {
       resumeSummary,
       resumeText,
       teammateSpecializationOverride: null,
+      sessionEntropy: `preview-${candidateName.length}-${resumeSummary.length}-${resumeText.length}-${resumeSummary.slice(0, 12)}`,
     });
   }, [candidateName, resumeSummary, resumeText]);
 
@@ -274,11 +275,6 @@ export function StartInterviewPage() {
                 >
                   {INTERVIEW_JOB_DESCRIPTION}
                 </div>
-                <div className="inh" style={{ marginTop: 6 }}>
-                  Scenario is inferred from this posting plus your resume. Override with{" "}
-                  <code className="mono-pill">NEXT_PUBLIC_INTERVIEW_JOB_DESCRIPTION</code> at build
-                  time if needed.
-                </div>
               </div>
 
               <div className="setup-section">
@@ -395,7 +391,7 @@ export function StartInterviewPage() {
                 className="sta"
                 style={{ minHeight: "auto", resize: "none", userSelect: "text" }}
               >
-                60 minutes · 6 phases
+                30 minutes · 6 phases
               </div>
             </div>
 

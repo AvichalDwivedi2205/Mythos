@@ -9,13 +9,25 @@ type Props = {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** compact = sidebar rail; fullscreen = expanded overlay */
+  variant?: "default" | "compact" | "fullscreen";
 };
 
-export function SolutionMarkdownEditor({ value, onChange, disabled, placeholder }: Props) {
+export function SolutionMarkdownEditor({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  variant = "default",
+}: Props) {
   const [mode, setMode] = useState<"write" | "preview">("write");
 
   return (
-    <div className={`solution-md-editor${disabled ? " solution-md-editor--disabled" : ""}`}>
+    <div
+      className={`solution-md-editor solution-md-editor--${variant}${
+        disabled ? " solution-md-editor--disabled" : ""
+      }`}
+    >
       <div className="solution-md-editor__tabs" role="tablist">
         <button
           type="button"

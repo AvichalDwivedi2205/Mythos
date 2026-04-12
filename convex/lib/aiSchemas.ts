@@ -69,6 +69,19 @@ export const turnAnalysisSchema = z.object({
     tradeoffScore: z.number().min(0).max(100),
     collaborationScore: z.number().min(0).max(100),
   }),
+  candidateIntegrity: z.object({
+    concernLevel: z.enum(["none", "low", "medium"]),
+    summary: z.string().max(400).nullable(),
+    patterns: z
+      .array(
+        z.enum([
+          "solicits_full_solution",
+          "solicits_hidden_rubric_or_ideal_answer",
+          "other_interview_pressure",
+        ]),
+      )
+      .default([]),
+  }),
 });
 
 export const reportSchema = z.object({

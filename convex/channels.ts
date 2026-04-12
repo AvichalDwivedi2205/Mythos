@@ -8,8 +8,6 @@ import {
   streamingResponseValidator,
   visibleMessageValidator,
 } from "./lib/validators";
-import { detectIntegrityWarning } from "../lib/integrity";
-
 const rateLimiter = new RateLimiter(
   components.rateLimiter as unknown as ConstructorParameters<typeof RateLimiter>[0],
   {
@@ -74,31 +72,6 @@ export const sendCandidateMessage = mutation({
     const content = args.content.trim();
     if (!content) {
       throw new Error("Message cannot be empty.");
-    }
-
-    const warning = detectIntegrityWarning(content);
-    if (warning?.blocked) {
-      await ctx.db.insert("events", {
-        sessionId: session._id,
-        channelId: null,
-        messageId: null,
-        type: "integrity_warning",
-        actor: "system",
-        target: args.channelKind,
-        metadataJson: JSON.stringify({
-          code: warning.code,
-          title: warning.title,
-          detail: warning.detail,
-        }),
-        createdAt: Date.now(),
-      });
-
-      return {
-        queued: false,
-        blocked: true,
-        messageId: null,
-        warning,
-      };
     }
 
     const channel = await getChannelByKind(ctx, session._id, args.channelKind);

@@ -1,5 +1,5 @@
 export const DEFAULT_SCENARIO_ID = "real-time-chat-at-scale" as const;
-export const DEFAULT_TIME_BUDGET_MS = 60 * 60 * 1000;
+export const DEFAULT_TIME_BUDGET_MS = 30 * 60 * 1000;
 
 export const PHASES = [
   "problem_framing",

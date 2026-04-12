@@ -143,6 +143,7 @@ export const integrityWarningValidator = v.object({
     v.literal("full_solution_request"),
     v.literal("hidden_rubric_request"),
     v.literal("direct_answer_request"),
+    v.literal("ai_assessed_pressure"),
   ),
   title: v.string(),
   detail: v.string(),

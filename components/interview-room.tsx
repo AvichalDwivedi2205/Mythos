@@ -1,15 +1,16 @@
 "use client";
 
 import {
+  useCallback,
   useDeferredValue,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useTransition,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import type { IntegrityWarning } from "@/lib/integrity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
@@ -106,13 +107,37 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   const [isSubmittingFinal, startFinalSubmit] = useTransition();
   const [streamResponses, setStreamResponses] = useState(true);
   const [solutionDraft, setSolutionDraft] = useState("");
-  const [integrityWarning, setIntegrityWarning] = useState<IntegrityWarning | null>(null);
+  const [solutionExpanded, setSolutionExpanded] = useState(false);
+  const [briefExpanded, setBriefExpanded] = useState(false);
   const [toasts, setToasts] = useState<RoomToast[]>([]);
   const [tabUnread, setTabUnread] = useState({ interviewer: false, teammate: false });
   const solutionSeededRef = useRef(false);
   const notifyBootstrappedRef = useRef(false);
   const lastAgentInterviewerIdRef = useRef<Id<"messages"> | null>(null);
   const lastAgentTeammateIdRef = useRef<Id<"messages"> | null>(null);
+  const toastSeqRef = useRef(0);
+
+  useEffect(() => {
+    if (!briefExpanded) {
+      return;
+    }
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setBriefExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [briefExpanded]);
+
+  const pushToast = useCallback((title: string, detail: string) => {
+    const id = ++toastSeqRef.current;
+    setToasts((list) => [...list, { id, title, detail }]);
+    window.setTimeout(() => {
+      setToasts((list) => list.filter((t) => t.id !== id));
+    }, 2000);
+  }, []);
+
   const deferredNoteSearch = useDeferredValue(noteSearch);
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const signalsRef = useRef<HTMLButtonElement | null>(null);
@@ -148,6 +173,12 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   const saveSolutionDraft = useMutation(api.workspace.saveSolutionDraft);
   const submitFinalSolution = useMutation(api.workspace.submitFinalSolution);
 
+  const aiGuardrailNotice = useMemo(() => {
+    return (
+      workspace?.notifications?.find((entry) => entry.type === "integrity_warning") ?? null
+    );
+  }, [workspace?.notifications]);
+
   useEffect(() => {
     if (sessionStatus?.sessionStatus === "completed") {
       router.prefetch(`/reports/${sessionPublicId}`);
@@ -177,11 +208,11 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     TEAMMATE_SPECIALIZATIONS[0];
 
   const remainingMs = room ? Math.max(0, room.timeBudgetMs - (now - room.startedAt)) : 0;
-  const timer = room ? formatTimer(remainingMs) : "60:00";
+  const timer = room ? formatTimer(remainingMs) : "30:00";
   const elapsedMs = room ? Math.min(Math.max(0, now - room.startedAt), room.timeBudgetMs) : 0;
   const timerProgress = room ? elapsedMs / room.timeBudgetMs : 0;
   const timerDashOffset = TIMER_RING_C * (1 - timerProgress);
-  const totalMinutes = room ? Math.round(room.timeBudgetMs / 60000) : 60;
+  const totalMinutes = room ? Math.round(room.timeBudgetMs / 60000) : 30;
 
   const normalizedNoteSearch = deferredNoteSearch.trim().toLowerCase();
   const visibleNotes = notes?.filter((note) => {
@@ -250,15 +281,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       lastAgentInterviewerIdRef.current = iv.id;
       if (activeTab !== "interviewer") {
         setTabUnread((s) => ({ ...s, interviewer: true }));
-        const t = Date.now();
-        setToasts((list) => [
-          ...list,
-          {
-            id: t,
-            title: "Interviewer replied",
-            detail: "Open the Interviewer tab to read the latest message.",
-          },
-        ]);
+        pushToast("Interviewer replied", "Open the Interviewer tab to read the latest message.");
         if (
           typeof document !== "undefined" &&
           document.hidden &&
@@ -282,15 +305,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       lastAgentTeammateIdRef.current = tm.id;
       if (activeTab !== "teammate") {
         setTabUnread((s) => ({ ...s, teammate: true }));
-        const t = Date.now();
-        setToasts((list) => [
-          ...list,
-          {
-            id: t,
-            title: `${teammateLabel} replied`,
-            detail: "Open the teammate tab to read the latest message.",
-          },
-        ]);
+        pushToast(`${teammateLabel} replied`, "Open the teammate tab to read the latest message.");
         if (
           typeof document !== "undefined" &&
           document.hidden &&
@@ -307,7 +322,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
         }
       }
     }
-  }, [interviewerMessages, teammateMessages, activeTab, room]);
+  }, [interviewerMessages, teammateMessages, activeTab, room, pushToast]);
 
   useEffect(() => {
     solutionSeededRef.current = false;
@@ -374,10 +389,8 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
           streamResponse: streamResponses,
         });
         if (result.blocked && result.warning) {
-          setIntegrityWarning(result.warning);
           return;
         }
-        setIntegrityWarning(null);
         if (channelKind === "interviewer") {
           setDraftInterviewer("");
         } else {
@@ -591,6 +604,46 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             </div>
           </div>
 
+          <div className="sidebar-solution">
+            <div className="rl" style={{ marginBottom: 6 }}>
+              Solution workspace
+            </div>
+            <SolutionMarkdownEditor
+              variant="compact"
+              value={solutionDraft}
+              onChange={setSolutionDraft}
+              placeholder="Markdown · autosaves"
+            />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setSolutionExpanded(true)}
+                style={{ flex: 1, minWidth: 120, fontSize: 12, padding: "6px 10px" }}
+              >
+                Expand editor
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                disabled={isSubmittingFinal || !solutionDraft.trim()}
+                onClick={onSubmitFinalSolution}
+                style={{ flex: 1, minWidth: 120, fontSize: 12, padding: "6px 10px" }}
+              >
+                {isSubmittingFinal
+                  ? "…"
+                  : workspace?.solution.finalSubmittedAt
+                    ? "Update final"
+                    : "Submit final"}
+              </button>
+            </div>
+            {workspace?.solution.finalSubmittedAt ? (
+              <div className="status-copy" style={{ fontSize: 10, opacity: 0.85 }}>
+                Locked {new Date(workspace.solution.finalSubmittedAt).toLocaleTimeString()}
+              </div>
+            ) : null}
+          </div>
+
           <div>
             <div className="rl" style={{ marginBottom: 7 }}>
               In this room
@@ -787,7 +840,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             <div
               className={`inpa composer composer--${activeTab === "interviewer" ? "interviewer" : "teammate"}`}
             >
-              {integrityWarning ? (
+              {aiGuardrailNotice ? (
                 <div
                   className="mev"
                   style={{
@@ -799,9 +852,9 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                 >
                   <span className="edot" style={{ background: "var(--amber)" }} />
                   <div>
-                    <strong>{integrityWarning.title}</strong>
+                    <strong>{aiGuardrailNotice.title}</strong>
                     <div style={{ marginTop: 4, fontSize: 13, opacity: 0.95 }}>
-                      {integrityWarning.detail}
+                      {aiGuardrailNotice.detail}
                     </div>
                   </div>
                 </div>
@@ -861,8 +914,24 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
         <aside className="room-side gpanel" id="right">
           <div className="nhd">
             <div className="ntitle">Shared brief</div>
+            <button
+              className="abtn"
+              type="button"
+              title="View brief full screen"
+              aria-label="View brief full screen"
+              onClick={() => setBriefExpanded(true)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M9 3H5a2 2 0 0 0-2 2v4M21 9V5a2 2 0 0 0-2-2h-4M3 15v4a2 2 0 0 0 2 2h4M15 21h4a2 2 0 0 0 2-2v-4"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
           </div>
-          <div className="nbody" style={{ maxHeight: 200, overflow: "auto", paddingBottom: 8 }}>
+          <div className="nbody room-brief-nbody">
             {workspace?.notifications && workspace.notifications.length > 0 ? (
               <div style={{ marginBottom: 10 }}>
                 <div className="rl" style={{ marginBottom: 6 }}>
@@ -900,10 +969,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
               <div className="shd">
                 <div className="slbl">Problem</div>
               </div>
-              <div
-                className="sta"
-                style={{ minHeight: 72, resize: "none", userSelect: "text", fontSize: 12 }}
-              >
+              <div className="sta sta--readonly" style={{ userSelect: "text" }}>
                 {workspace?.problemStatement ?? room.title}
               </div>
             </div>
@@ -912,10 +978,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                 <div className="shd">
                   <div className="slbl">Job description</div>
                 </div>
-                <div
-                  className="sta"
-                  style={{ minHeight: 56, resize: "none", userSelect: "text", fontSize: 12 }}
-                >
+                <div className="sta sta--readonly" style={{ userSelect: "text" }}>
                   {workspace.jobDescription}
                 </div>
               </div>
@@ -925,44 +988,10 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                 <div className="shd">
                   <div className="slbl">Shared pool seed</div>
                 </div>
-                <div
-                  className="sta"
-                  style={{ minHeight: 56, resize: "none", userSelect: "text", fontSize: 12 }}
-                >
+                <div className="sta sta--readonly" style={{ userSelect: "text" }}>
                   {workspace.sharedContextSeed}
                 </div>
               </div>
-            ) : null}
-          </div>
-
-          <div className="nhd" style={{ marginTop: 4 }}>
-            <div className="ntitle">Final solution</div>
-          </div>
-          <div className="nbody" style={{ paddingBottom: 8 }}>
-            <SolutionMarkdownEditor
-              value={solutionDraft}
-              onChange={setSolutionDraft}
-              placeholder="Write in Markdown — headings, lists, and code fences supported. Autosaves to the shared workspace."
-            />
-            <div className="button-row" style={{ marginTop: 8, gap: 8 }}>
-              <button
-                className="primary-button"
-                type="button"
-                disabled={isSubmittingFinal || !solutionDraft.trim()}
-                onClick={onSubmitFinalSolution}
-              >
-                {isSubmittingFinal
-                  ? "Submitting…"
-                  : workspace?.solution.finalSubmittedAt
-                    ? "Update final submission"
-                    : "Submit final solution"}
-              </button>
-            </div>
-            {workspace?.solution.finalSubmittedAt ? (
-              <p className="status-copy" style={{ marginTop: 8 }}>
-                Final solution locked in at{" "}
-                {new Date(workspace.solution.finalSubmittedAt).toLocaleString()}.
-              </p>
             ) : null}
           </div>
 
@@ -1047,6 +1076,101 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
           </div>
         </aside>
       </div>
+
+      {briefExpanded ? (
+        <div
+          className="solution-expand-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Shared brief"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setBriefExpanded(false);
+            }
+          }}
+        >
+          <div
+            className="solution-expand-panel brief-expand-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="solution-expand-panel__hd">
+              <span>Shared brief</span>
+              <button className="endbtn" type="button" onClick={() => setBriefExpanded(false)}>
+                Close
+              </button>
+            </div>
+            <div className="solution-expand-panel__bd brief-expand-body">
+              {workspace?.notifications && workspace.notifications.length > 0 ? (
+                <div className="brief-expand-block">
+                  <h3>Alerts</h3>
+                  {workspace.notifications.map((note) => (
+                    <div key={`${note.type}-${note.createdAt}`} style={{ marginBottom: 12 }}>
+                      <strong style={{ display: "block", marginBottom: 4 }}>{note.title}</strong>
+                      <p>{note.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="brief-expand-block">
+                <h3>Problem</h3>
+                <p>{workspace?.problemStatement ?? room.title}</p>
+              </div>
+              {workspace?.jobDescription ? (
+                <div className="brief-expand-block">
+                  <h3>Job description</h3>
+                  <p>{workspace.jobDescription}</p>
+                </div>
+              ) : null}
+              {workspace?.sharedContextSeed ? (
+                <div className="brief-expand-block">
+                  <h3>Shared pool seed</h3>
+                  <p>{workspace.sharedContextSeed}</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {solutionExpanded ? (
+        <div
+          className="solution-expand-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Expanded solution editor"
+        >
+          <div className="solution-expand-panel">
+            <div className="solution-expand-panel__hd">
+              <span>Solution workspace · Markdown</span>
+              <button className="endbtn" type="button" onClick={() => setSolutionExpanded(false)}>
+                Close
+              </button>
+            </div>
+            <div className="solution-expand-panel__bd">
+              <SolutionMarkdownEditor
+                variant="fullscreen"
+                value={solutionDraft}
+                onChange={setSolutionDraft}
+                placeholder="Write your full design write-up — headings, lists, code fences. Autosaves."
+              />
+            </div>
+            <div className="solution-expand-panel__ft">
+              <button className="primary-button" type="button" onClick={onSubmitFinalSolution}>
+                {isSubmittingFinal
+                  ? "Submitting…"
+                  : workspace?.solution.finalSubmittedAt
+                    ? "Update final submission"
+                    : "Submit final solution"}
+              </button>
+              {workspace?.solution.finalSubmittedAt ? (
+                <span className="status-copy" style={{ alignSelf: "center" }}>
+                  Last submitted {new Date(workspace.solution.finalSubmittedAt).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="room-toasts" aria-live="polite">
         {toasts.map((toast) => (

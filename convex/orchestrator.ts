@@ -462,6 +462,15 @@ export const applyTurnAnalysis = internalMutation({
       latestInterviewerChallenge: string;
       latestTeammateConcern: string;
       latestCrossChannelDigest: string;
+      candidateIntegrity?: {
+        concernLevel: "none" | "low" | "medium";
+        summary: string | null;
+        patterns: Array<
+          | "solicits_full_solution"
+          | "solicits_hidden_rubric_or_ideal_answer"
+          | "other_interview_pressure"
+        >;
+      };
       extractedFacts: Array<{
         kind:
           | "requirement"
@@ -575,6 +584,37 @@ export const applyTurnAnalysis = internalMutation({
       snapshotType: "live",
       createdAt: now,
     });
+
+    const integrity = analysis.candidateIntegrity ?? {
+      concernLevel: "none" as const,
+      summary: null,
+      patterns: [] as Array<
+        "solicits_full_solution" | "solicits_hidden_rubric_or_ideal_answer" | "other_interview_pressure"
+      >,
+    };
+    const seriousIntegrity =
+      integrity &&
+      (integrity.concernLevel === "medium" ||
+        (integrity.concernLevel === "low" &&
+          integrity.patterns.some((p) =>
+            ["solicits_full_solution", "solicits_hidden_rubric_or_ideal_answer"].includes(p),
+          )));
+    if (seriousIntegrity && integrity.summary) {
+      await ctx.db.insert("events", {
+        sessionId: args.sessionId,
+        channelId: null,
+        messageId: args.candidateMessageId,
+        type: "integrity_warning",
+        actor: "system",
+        target: "candidate",
+        metadataJson: JSON.stringify({
+          code: "ai_assessed_pressure",
+          title: "Interview guardrail",
+          detail: integrity.summary,
+        }),
+        createdAt: now,
+      });
+    }
 
     return null;
   },

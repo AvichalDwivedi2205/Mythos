@@ -416,17 +416,196 @@ const scenarioTracks: Record<ScenarioTrackId, ScenarioTrack> = {
   },
 };
 
+type SessionVariantPack = {
+  variantIndex: number;
+  displayTitle: string;
+  problemLead: string;
+  objectiveAddon: string;
+  constraintBlock: string;
+  stressScenario: string;
+  focusLines: string[];
+  interviewerBrief: string;
+};
+
+const MESSAGING_DEEP_VARIANTS: Array<{
+  title: string;
+  problemLead: string;
+  objectiveAddon: string;
+  constraints: string[];
+  stress: string;
+  checklist: string[];
+}> = [
+  {
+    title: "Global Messaging Platform",
+    problemLead:
+      "You are designing a production-grade messaging layer for a consumer product with global traffic.",
+    objectiveAddon:
+      "Emphasize durable fan-out, per-conversation ordering, and graceful degradation when individual regions misbehave.",
+    constraints: [
+      "Groups up to 500 members must not collapse hot-partition throughput for 1:1 chats.",
+      "Offline sync must reconcile without exposing internal broker sequence gaps to clients.",
+      "Read receipts and typing may drop under load; message delivery may not.",
+      "You must quantify ordering scope (per chat vs global) and defend the choice.",
+    ],
+    stress:
+      "A viral burst multiplies writes ~20× in 90 seconds while one region’s shard leadership flaps — show how you detect it, shed load, and avoid double delivery.",
+    checklist: [
+      "State 3 measurable SLAs before drawing components.",
+      "Trace one cross-region send with IDs, ordering, and retries end-to-end.",
+      "Name two explicit backpressure points and who consumes them.",
+    ],
+  },
+  {
+    title: "Unified Conversation Service",
+    problemLead:
+      "Treat chat as a first-class product surface: search, threads, and attachments ride the same pipeline as text.",
+    objectiveAddon:
+      "Separate hot path (send/ack) from cold path (history, search indexing) without double-charging storage costs.",
+    constraints: [
+      "Attachments and large payloads cannot block the sub-200ms send acknowledgement path.",
+      "Thread replies must stay ordered relative to their parent without a global total order.",
+      "Search/indexing may lag minutes; messaging state may not.",
+      "Call out how you prevent abusive clients from pinning hot keys indefinitely.",
+    ],
+    stress:
+      "A deploy pushes a bad serialization schema while a campaign drives a 50× burst — walk through detection, rollback, and safe replay.",
+    checklist: [
+      "Draw data flow for send vs search with different storage systems if needed.",
+      "Explain idempotency keys for at-least-once delivery.",
+      "Identify one consistency tradeoff you accept for search freshness.",
+    ],
+  },
+  {
+    title: "Regional Messaging Mesh",
+    problemLead:
+      "Users expect low latency in-region with eventual convergence across regions — not a single global choke point.",
+    objectiveAddon:
+      "Partition ownership, leader election boundaries, and failover drills are first-class in your story.",
+    constraints: [
+      "Cross-region traffic must avoid a single writer bottleneck unless you justify it.",
+      "You must address network partitions: what happens to sends when regions cannot talk?",
+      "Presence may be stale; undelivered messages may not silently disappear.",
+      "Describe how you migrate traffic between cells without mass client reconnect storms.",
+    ],
+    stress:
+      "Half of a region’s brokers restart during peak — show how clients and routers rebalance without stampeding metadata stores.",
+    checklist: [
+      "List failure domains (AZ, region, global control plane) and blast radius for each.",
+      "Give a concrete leader election or ownership story for at least one shard type.",
+      "Cover observability: what signals page you at 2am?",
+    ],
+  },
+  {
+    title: "Realtime Conversation Infrastructure",
+    problemLead:
+      "Engineering reliability for mobile + web clients with flaky networks and aggressive backgrounding.",
+    objectiveAddon:
+      "Client protocol design (reconnect, resume tokens, gap fill) matters as much as server scale.",
+    constraints: [
+      "Mobile clients may stay offline for days; replay must be bounded and user-visible.",
+      "Battery and data usage constrain push/pull frequency — justify your strategy.",
+      "WebSockets vs long polling vs QUIC: pick and defend for your assumed client mix.",
+      "Security: token binding, device revocation, and abuse on connection storms.",
+    ],
+    stress:
+      "A client bug causes reconnect loops that amplify write QPS — how does the edge protect the core?",
+    checklist: [
+      "Sketch client session state machine for connect / resume / gap recovery.",
+      "Explain how you cap per-device connection churn.",
+      "Tie at least one control-plane vs data-plane boundary to a concrete failure.",
+    ],
+  },
+];
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function rotateArray<T>(items: T[], start: number): T[] {
+  if (items.length === 0) {
+    return items;
+  }
+  const n = ((start % items.length) + items.length) % items.length;
+  return [...items.slice(n), ...items.slice(0, n)];
+}
+
+function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVariantPack {
+  const h = hashString(entropy + track.id);
+
+  if (track.id === "messaging") {
+    const idx = h % MESSAGING_DEEP_VARIANTS.length;
+    const mv = MESSAGING_DEEP_VARIANTS[idx];
+    const constraintBlock = mv.constraints.map((c, i) => `${i + 1}. ${c}`).join("\n");
+    const interviewerBrief = [
+      mv.title,
+      `${mv.problemLead} ${track.objective}`,
+      ...(mv.objectiveAddon ? [mv.objectiveAddon] : []),
+      `Requirements:\n${constraintBlock}`,
+      `Failure scenario to stress-test the design:\n${mv.stress}`,
+    ].join("\n\n");
+
+    return {
+      variantIndex: idx,
+      displayTitle: mv.title,
+      problemLead: `${mv.problemLead} ${track.objective}`,
+      objectiveAddon: mv.objectiveAddon,
+      constraintBlock,
+      stressScenario: mv.stress,
+      focusLines: rotateArray(track.focusAreas, h),
+      interviewerBrief,
+    };
+  }
+
+  const idx = h % 3;
+  const rotated = rotateArray(track.focusAreas, idx);
+  const stressAlt = [
+    `${track.stressAngle}`,
+    `Escalation: ${track.stressAngle} while a dependent service SLO breaches simultaneously.`,
+    `Twist: ${track.stressAngle} with a partial data migration in flight.`,
+  ][idx % 3];
+
+  const constraintBlock = rotated
+    .slice(0, 4)
+    .map((c, i) => `${i + 1}. ${c}`)
+    .join("\n");
+
+  const interviewerBrief = [
+    track.title,
+    track.objective,
+    `Design focus:\n${constraintBlock}`,
+    `Failure scenario:\n${stressAlt}`,
+  ].join("\n\n");
+
+  return {
+    variantIndex: idx,
+    displayTitle: track.title,
+    problemLead: `${track.title}. ${track.objective}`,
+    objectiveAddon: "",
+    constraintBlock,
+    stressScenario: stressAlt,
+    focusLines: rotated,
+    interviewerBrief,
+  };
+}
+
+/** Deterministic variety per session — use public session id or similar. */
 export function buildInterviewBlueprint(args: {
   candidateName: string;
   jobDescription: string;
   resumeSummary: string;
   resumeText: string;
   teammateSpecializationOverride?: TeammateSpecialization | null;
+  sessionEntropy?: string;
 }): InterviewBlueprint {
+  const entropy = normalizeText(args.sessionEntropy ?? `${args.candidateName}-${args.resumeSummary.length}-${args.resumeText.length}`);
   const combined = normalizeText(
     [args.jobDescription, args.resumeSummary, args.resumeText].filter(Boolean).join("\n"),
   );
-  const track = pickTrack(combined);
+  const track = pickTrack(combined, entropy);
   const roleLevel = detectRoleLevel(combined);
   const candidateSummary = truncateText(
     normalizeText(args.resumeSummary || args.resumeText || args.candidateName),
@@ -438,38 +617,32 @@ export function buildInterviewBlueprint(args: {
   const teammateMeta =
     TEAMMATE_SPECIALIZATIONS.find((entry) => entry.value === teammateSpecialization) ??
     TEAMMATE_SPECIALIZATIONS[0];
+  const variantPack = buildSessionVariant(track, entropy);
   const sharedContextSeed = [
     `Candidate background: ${candidateSummary || "Generalist systems background."}`,
     `Job focus: ${jobFocus || "General distributed systems and architecture depth."}`,
-    `Pressure angle: ${track.stressAngle}`,
+    `Pressure angle: ${variantPack.stressScenario}`,
   ].join("\n");
-  const focusAreas = track.focusAreas.map((item) => `- ${item}`).join("\n");
+  const focusAreas = variantPack.focusLines.map((item) => `- ${item}`).join("\n");
   const solutionTemplate = buildSolutionTemplate(track, roleLevel);
 
   return {
-    scenarioId: `generated-${track.id}`,
-    title: track.title,
+    scenarioId: `generated-${track.id}-s${variantPack.variantIndex}`,
+    title: variantPack.displayTitle,
     subtitle: `${track.categoryLabel} · ${roleLevel}`,
     roleLevel,
     problemStatement: [
-      track.objective,
-      jobFocus ? `Use the job description as the framing signal: ${jobFocus}` : null,
-      candidateSummary
-        ? `Shape the discussion so it feels plausible for ${args.candidateName || "the candidate"} based on this background: ${candidateSummary}`
-        : null,
-      `Key pressure areas:\n${focusAreas}`,
+      variantPack.problemLead,
+      variantPack.objectiveAddon ? variantPack.objectiveAddon : null,
+      jobFocus ? `Context from the role: ${jobFocus}` : null,
+      candidateSummary ? `Candidate background: ${candidateSummary}` : null,
+      variantPack.constraintBlock ? `Requirements:\n${variantPack.constraintBlock}` : null,
+      `Areas to cover:\n${focusAreas}`,
+      `Stress test: ${variantPack.stressScenario}`,
     ]
       .filter(Boolean)
       .join("\n\n"),
-    initialInterviewerBrief: [
-      `Today’s problem is ${track.title}.`,
-      track.objective,
-      jobFocus ? `The role leans on: ${jobFocus}` : null,
-      `Start by clarifying assumptions, then walk through the architecture, critical data flows, scaling model, failure handling, and tradeoffs.`,
-      `Be ready to defend the design under pressure around ${track.stressAngle.toLowerCase()}.`,
-    ]
-      .filter(Boolean)
-      .join("\n\n"),
+    initialInterviewerBrief: variantPack.interviewerBrief,
     initialTeammateMessage: buildTeammateOpening(track, teammateMeta.name, teammateSpecialization),
     teammateSpecialization,
     teammateName: teammateMeta.name,
@@ -481,8 +654,8 @@ export function buildInterviewBlueprint(args: {
     })),
     solutionTemplate,
     sharedContextSeed,
-    initialRequirementSummary: track.focusAreas.join(" | "),
-    initialRiskSummary: track.stressAngle,
+    initialRequirementSummary: variantPack.focusLines.join(" | "),
+    initialRiskSummary: variantPack.stressScenario,
   };
 }
 
@@ -565,7 +738,7 @@ function buildTeammateOpening(
   specialization: TeammateSpecialization,
 ) {
   const openerBySpecialization: Record<TeammateSpecialization, string> = {
-    sre_infra: `I’m ${teammateName}. I’ll pressure-test availability, capacity, and what breaks first under ${track.stressAngle.toLowerCase()}.`,
+    sre_infra: `I’m ${teammateName}. I’ll pressure-test availability, capacity, and what breaks first when the room runs the stress scenario we picked for this session.`,
     backend: `I’m ${teammateName}. I’ll stay close to APIs, state ownership, and how the core services behave under load.`,
     data: `I’m ${teammateName}. I’ll focus on data movement, correctness, freshness, and whether the signals stay trustworthy at scale.`,
   };
@@ -573,21 +746,19 @@ function buildTeammateOpening(
   return openerBySpecialization[specialization];
 }
 
-function pickTrack(text: string) {
-  let bestTrack = scenarioTracks.messaging;
-  let bestScore = -1;
-
-  for (const track of Object.values(scenarioTracks)) {
-    const score = track.keywords.reduce((total, keyword) => {
-      return total + (text.includes(keyword) ? 2 : 0);
-    }, 0);
-    if (score > bestScore) {
-      bestTrack = track;
-      bestScore = score;
-    }
+function pickTrack(text: string, entropy: string): ScenarioTrack {
+  const scored = Object.values(scenarioTracks).map((track) => ({
+    track,
+    score: track.keywords.reduce((total, keyword) => total + (text.includes(keyword) ? 2 : 0), 0),
+  }));
+  scored.sort((a, b) => b.score - a.score);
+  const topScore = scored[0].score;
+  const tops = scored.filter((s) => s.score === topScore);
+  if (tops.length === 1) {
+    return tops[0].track;
   }
-
-  return bestTrack;
+  return [...tops].sort((a, b) => hashString(entropy + a.track.id) - hashString(entropy + b.track.id))[0]
+    .track;
 }
 
 function inferTeammate(track: ScenarioTrack, text: string): TeammateSpecialization {
