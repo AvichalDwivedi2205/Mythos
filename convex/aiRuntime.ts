@@ -6,10 +6,23 @@ import { components, internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
 import { getInterviewLanguageModel } from "./lib/llmProvider";
 import { getClarificationAnswer } from "./lib/scenario";
-import { reportSchema, turnAnalysisSchema, visibleAgentResponseSchema } from "./lib/aiSchemas";
+import {
+  reportSchema,
+  turnAnalysisSchema,
+  visibleAgentResponseDraftSchema,
+} from "./lib/aiSchemas";
+import {
+  buildFallbackVisibleResponse,
+  buildVisibleResponseOutputContract,
+  repairVisibleAgentResponse,
+} from "./lib/visibleResponse";
 
-const model = getInterviewLanguageModel();
+const interviewerModel = getInterviewLanguageModel("interviewer");
+const teammateModel = getInterviewLanguageModel("teammate");
+const analysisModel = getInterviewLanguageModel("analysis");
+const reportModel = getInterviewLanguageModel("report");
 const agentComponent = components.agent as unknown as AgentComponent;
+const MAX_VISIBLE_RESPONSE_ATTEMPTS = 2;
 
 const usageHandler: UsageHandler = async (
   ctx,
@@ -57,7 +70,7 @@ The problem statement and shared pool context include a "Quantified targets" blo
 
 export const interviewerAgent = new Agent(agentComponent, {
   name: "Interviewer Agent",
-  languageModel: model,
+  languageModel: interviewerModel,
   instructions: `${INTERVIEWER_AGENT_INSTRUCTIONS}
 
 The product has two candidate-facing chat tabs: this interviewer channel and a separate teammate channel for informal peer-style collaboration. You do not need to repeat that; focus here on structured probing.`,
@@ -69,7 +82,7 @@ The product has two candidate-facing chat tabs: this interviewer channel and a s
 
 export const teammateAgent = new Agent(agentComponent, {
   name: "Teammate Agent",
-  languageModel: model,
+  languageModel: teammateModel,
   instructions: `You are the candidate's specialist teammate in a system-design interview (teammate tab only; the interviewer tab is separate).
 The candidate is encouraged to bounce ideas, tradeoffs, and half-formed sketches with you. Short brainstorms and "what if" questions are normal collaboration, not cheating.
 
@@ -149,45 +162,66 @@ export async function generateVisibleResponse(
   },
 ) {
   const prompt = buildVisiblePrompt(args.channelKind, args.context);
-
   const agent = args.channelKind === "interviewer" ? interviewerAgent : teammateAgent;
   const { thread } = await agent.continueThread(ctx, {
     threadId: args.context.threadId,
     userId: args.context.sessionPublicId,
   });
-  const parsed = args.onPartialContent
-    ? visibleAgentResponseSchema.parse(
-        await streamVisibleResponse(thread, prompt, args.onPartialContent),
-      )
-    : visibleAgentResponseSchema.parse(
-        (
-          await thread.generateObject({
-            prompt,
-            schema: visibleAgentResponseSchema,
+
+  let lastPartialContent = "";
+  for (let attempt = 1; attempt <= MAX_VISIBLE_RESPONSE_ATTEMPTS; attempt += 1) {
+    try {
+      const rawResponse = args.onPartialContent
+        ? await streamVisibleResponse(thread, prompt, async (content) => {
+            lastPartialContent = content;
+            await args.onPartialContent?.(content);
           })
-        ).object,
+        : (
+            await thread.generateObject({
+              prompt,
+              schema: visibleAgentResponseDraftSchema,
+            })
+          ).object;
+      const parsed = repairVisibleAgentResponse(args.channelKind, rawResponse, {
+        partialContent: lastPartialContent,
+      });
+
+      if (
+        args.channelKind === "teammate" &&
+        parsed.needsClarification &&
+        parsed.clarificationQuestion
+      ) {
+        const answer = getClarificationAnswer(
+          parsed.clarificationQuestion,
+          args.context.approvedClarifications,
+        );
+        if (answer) {
+          return {
+            ...parsed,
+            badgeKind: "clarification" as const,
+            eventSummary: "Clarification relayed from interviewer",
+            content: `I checked with the interviewer: ${answer}\n\n${parsed.content}`,
+          };
+        }
+      }
+
+      return parsed;
+    } catch (error) {
+      const canSalvagePartial = lastPartialContent.trim().length >= 24;
+      const isFinalAttempt = attempt === MAX_VISIBLE_RESPONSE_ATTEMPTS;
+
+      console.error(
+        `[generateVisibleResponse] Attempt ${attempt} failed for ${args.channelKind}.`,
+        error,
       );
 
-  if (
-    args.channelKind === "teammate" &&
-    parsed.needsClarification &&
-    parsed.clarificationQuestion
-  ) {
-    const answer = getClarificationAnswer(
-      parsed.clarificationQuestion,
-      args.context.approvedClarifications,
-    );
-    if (answer) {
-      return {
-        ...parsed,
-        badgeKind: "clarification" as const,
-        eventSummary: "Clarification relayed from interviewer",
-        content: `I checked with the interviewer: ${answer}\n\n${parsed.content}`,
-      };
+      if (canSalvagePartial || isFinalAttempt) {
+        return buildFallbackVisibleResponse(args.channelKind, lastPartialContent);
+      }
     }
   }
 
-  return parsed;
+  return buildFallbackVisibleResponse(args.channelKind, lastPartialContent);
 }
 
 async function streamVisibleResponse(
@@ -197,7 +231,7 @@ async function streamVisibleResponse(
 ) {
   const result = await thread.streamObject({
     prompt,
-    schema: visibleAgentResponseSchema,
+    schema: visibleAgentResponseDraftSchema,
   });
   let lastContent = "";
 
@@ -293,7 +327,7 @@ Produce:
 Do not mention hidden chain-of-thought.`;
 
   const result = await generateObject({
-    model,
+    model: analysisModel,
     prompt,
     schema: turnAnalysisSchema,
   });
@@ -337,7 +371,7 @@ ${args.transcriptText}
 Write a concise, evidence-backed report. Every strength, concern, and notable moment must tie to a concrete sequence number from the transcript.`;
 
   const result = await generateObject({
-    model,
+    model: reportModel,
     prompt,
     schema: reportSchema,
   });
@@ -413,7 +447,9 @@ Output rules:
 - keep content concise, sharp, and interview-like
 - ask a question whenever possible
 - during deep dive or wrap-up, occasionally force the candidate to consolidate the final solution
-- never give the full solution`;
+- never give the full solution
+
+${buildVisibleResponseOutputContract("interviewer")}`;
   }
 
   return `You are speaking in the candidate-visible teammate channel.
@@ -470,5 +506,7 @@ Output rules:
 - Never return empty content. If the candidate is vague, ask one sharp follow-up.
 - Do not paste a full canonical architecture that replaces their work; stay in "sparring partner" mode.
 
-Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.`;
+Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.
+
+${buildVisibleResponseOutputContract("teammate")}`;
 }

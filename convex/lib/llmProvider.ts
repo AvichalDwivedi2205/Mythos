@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 /** Convex / server env: `gemini` (default) or `openrouter`. */
 export type LlmProviderId = "gemini" | "openrouter";
+export type InterviewLlmRole = "interviewer" | "teammate" | "analysis" | "report";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
 const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite";
@@ -23,58 +24,129 @@ export function getLlmProviderId(): LlmProviderId {
   return normalizeProvider(process.env.LLM_PROVIDER);
 }
 
-/**
- * Single language model for interviewer agent, teammate agent, turn analysis, and reports.
- * Configure via Convex env:
- * - Default: `GEMINI_API_KEY` + optional `GEMINI_MODEL`
- * - OpenRouter: `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL`
- */
-export function getInterviewLanguageModel() {
-  const provider = getLlmProviderId();
+function envWithFallback(
+  primaryKey: string,
+  fallbackKey: string | null,
+): { envKey: string; value: string | undefined } {
+  if (fallbackKey) {
+    const fallbackValue = process.env[fallbackKey];
+    if (fallbackValue) {
+      return { envKey: fallbackKey, value: fallbackValue };
+    }
+  }
+
+  return {
+    envKey: primaryKey,
+    value: process.env[primaryKey],
+  };
+}
+
+function getRoleSpecificEnvKeys(
+  provider: LlmProviderId,
+  role: InterviewLlmRole,
+): {
+  apiKeyEnvKey: string;
+  modelEnvKey: string;
+  apiKey: string | undefined;
+  modelId: string;
+} {
+  const useSecondaryKey = role === "teammate";
 
   if (provider === "openrouter") {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
+    const apiKeyConfig = envWithFallback(
+      "OPENROUTER_API_KEY",
+      useSecondaryKey ? "OPENROUTER_API_KEY_1" : null,
+    );
+    const modelConfig = envWithFallback(
+      "OPENROUTER_MODEL",
+      useSecondaryKey ? "OPENROUTER_MODEL_1" : null,
+    );
+
+    return {
+      apiKeyEnvKey: apiKeyConfig.envKey,
+      modelEnvKey: modelConfig.envKey,
+      apiKey: apiKeyConfig.value,
+      modelId: modelConfig.value ?? DEFAULT_OPENROUTER_MODEL,
+    };
+  }
+
+  const apiKeyConfig = envWithFallback(
+    "GEMINI_API_KEY",
+    useSecondaryKey ? "GEMINI_API_KEY_1" : null,
+  );
+  const modelConfig = envWithFallback(
+    "GEMINI_MODEL",
+    useSecondaryKey ? "GEMINI_MODEL_1" : null,
+  );
+
+  return {
+    apiKeyEnvKey: apiKeyConfig.envKey,
+    modelEnvKey: modelConfig.envKey,
+    apiKey: apiKeyConfig.value,
+    modelId: modelConfig.value ?? DEFAULT_GEMINI_MODEL,
+  };
+}
+
+export function describeInterviewLlm(role: InterviewLlmRole = "interviewer"): {
+  role: InterviewLlmRole;
+  provider: LlmProviderId;
+  modelId: string;
+  apiKeyEnvKey: string;
+  modelEnvKey: string;
+} {
+  const provider = getLlmProviderId();
+  const config = getRoleSpecificEnvKeys(provider, role);
+
+  return {
+    role,
+    provider,
+    modelId: config.modelId,
+    apiKeyEnvKey: config.apiKeyEnvKey,
+    modelEnvKey: config.modelEnvKey,
+  };
+}
+
+/**
+ * Model routing:
+ * - Interviewer, analysis, report: primary key (`GEMINI_API_KEY` / `OPENROUTER_API_KEY`)
+ * - Teammate: secondary key when present (`GEMINI_API_KEY_1` / `OPENROUTER_API_KEY_1`),
+ *   otherwise falls back to the primary key.
+ *
+ * Configure via Convex env:
+ * - Gemini: `GEMINI_API_KEY`, optional `GEMINI_API_KEY_1`, optional `GEMINI_MODEL`, optional `GEMINI_MODEL_1`
+ * - OpenRouter: `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, optional `OPENROUTER_API_KEY_1`,
+ *   optional `OPENROUTER_MODEL`, optional `OPENROUTER_MODEL_1`
+ */
+export function getInterviewLanguageModel(role: InterviewLlmRole = "interviewer") {
+  const provider = getLlmProviderId();
+  const config = getRoleSpecificEnvKeys(provider, role);
+
+  if (provider === "openrouter") {
+    if (!config.apiKey) {
       throw new Error(
-        "OPENROUTER_API_KEY is required when LLM_PROVIDER=openrouter (set in Convex → Settings → Environment Variables).",
+        role === "teammate"
+          ? "OPENROUTER_API_KEY_1 or OPENROUTER_API_KEY is required for teammate traffic when LLM_PROVIDER=openrouter."
+          : "OPENROUTER_API_KEY is required when LLM_PROVIDER=openrouter (set in Convex → Settings → Environment Variables).",
       );
     }
     const openrouter = createOpenAI({
       baseURL: "https://openrouter.ai/api/v1",
-      apiKey,
+      apiKey: config.apiKey,
       headers: {
         "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "https://mythos.local",
         "X-Title": process.env.OPENROUTER_APP_TITLE ?? "Mythos",
       },
     });
-    const modelId = (process.env.OPENROUTER_MODEL ?? DEFAULT_OPENROUTER_MODEL) as string;
-    return openrouter(modelId);
+    return openrouter(config.modelId);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!config.apiKey) {
     throw new Error(
-      "GEMINI_API_KEY is required when LLM_PROVIDER is gemini (default). Set it in Convex → Settings → Environment Variables.",
+      role === "teammate"
+        ? "GEMINI_API_KEY_1 or GEMINI_API_KEY is required for teammate traffic when LLM_PROVIDER is gemini."
+        : "GEMINI_API_KEY is required when LLM_PROVIDER is gemini (default). Set it in Convex → Settings → Environment Variables.",
     );
   }
-  const google = createGoogleGenerativeAI({ apiKey });
-  const modelId = (process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL) as string;
-  return google(modelId);
-}
-
-export function describeInterviewLlm(): {
-  provider: LlmProviderId;
-  modelId: string;
-} {
-  const provider = getLlmProviderId();
-  if (provider === "openrouter") {
-    return {
-      provider,
-      modelId: process.env.OPENROUTER_MODEL ?? DEFAULT_OPENROUTER_MODEL,
-    };
-  }
-  return {
-    provider,
-    modelId: process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL,
-  };
+  const google = createGoogleGenerativeAI({ apiKey: config.apiKey });
+  return google(config.modelId);
 }

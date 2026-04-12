@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mythos Technical One-Pager</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 11mm;
+      }
+
+      :root {
+        --ink: #112233;
+        --muted: #5d6778;
+        --line: #d8e0e8;
+        --panel: #f6f8fb;
+        --panel-strong: #ecf2f7;
+        --brand: #0c8f63;
+        --brand-soft: #dff5ed;
+        --accent: #1f5fbf;
+        --accent-soft: #e6eefc;
+        --warn: #a76413;
+        --warn-soft: #fff2df;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        color: var(--ink);
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background: white;
+      }
+
+      body {
+        font-size: 10.25px;
+        line-height: 1.34;
+      }
+
+      .page {
+        min-height: 272mm;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px 18px 14px;
+        background:
+          radial-gradient(circle at top right, rgba(31, 95, 191, 0.1), transparent 34%),
+          radial-gradient(circle at top left, rgba(12, 143, 99, 0.12), transparent 30%),
+          linear-gradient(180deg, #ffffff 0%, #f9fbfd 100%);
+      }
+
+      .eyebrow {
+        font-size: 8.6px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 5px;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        font-size: 24px;
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        margin-top: 6px;
+        max-width: 92%;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .chip {
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 8.8px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 7px;
+      }
+
+      .flow-box {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 9px 10px;
+        background: var(--panel);
+        min-height: 66px;
+      }
+
+      .flow-box strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 9.6px;
+      }
+
+      .flow-box p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 8.9px;
+      }
+
+      .flow-arrow {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: -1px;
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: 1.2fr 0.9fr;
+        gap: 9px;
+        flex: 1;
+      }
+
+      .stack {
+        display: grid;
+        gap: 9px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 11px 12px;
+        background: white;
+      }
+
+      .card-tint {
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+      }
+
+      .card-title {
+        margin: 0 0 7px;
+        font-size: 9px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .summary {
+        margin: 0;
+        font-size: 10.55px;
+      }
+
+      .grid-two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+      }
+
+      .mini {
+        border-radius: 11px;
+        padding: 8px 9px;
+      }
+
+      .mini h3 {
+        margin: 0 0 4px;
+        font-size: 9.4px;
+      }
+
+      .mini p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      .brand-box {
+        background: var(--brand-soft);
+      }
+
+      .accent-box {
+        background: var(--accent-soft);
+      }
+
+      .warn-box {
+        background: var(--warn-soft);
+      }
+
+      ol,
+      ul {
+        margin: 0;
+        padding-left: 16px;
+      }
+
+      li + li {
+        margin-top: 4px;
+      }
+
+      .runtime li {
+        margin-top: 5px;
+      }
+
+      .runtime strong,
+      .matrix dt {
+        color: var(--ink);
+      }
+
+      .matrix {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 6px 8px;
+        margin: 0;
+      }
+
+      .matrix dt {
+        font-weight: 700;
+      }
+
+      .matrix dd {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-size: 8.6px;
+        color: var(--muted);
+        padding-top: 1px;
+      }
+
+      .footer strong {
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="eyebrow">One-Page Technical Overview</div>
+        <h1>Mythos / Aperture</h1>
+        <p class="subtitle">
+          A real-time, dual-agent system design interview simulator built on Next.js and Convex.
+          The product combines a formal interviewer lane, a specialist teammate lane, shared
+          session memory, live progress signals, and an evidence-backed report with PDF export.
+        </p>
+        <div class="chip-row">
+          <span class="chip">Next.js 16 App Router</span>
+          <span class="chip">React 19</span>
+          <span class="chip">Convex 1.35 realtime backend</span>
+          <span class="chip">@convex-dev/agent + rate limiter</span>
+          <span class="chip">Gemini or OpenRouter via AI SDK</span>
+          <span class="chip">Playwright PDF rendering</span>
+        </div>
+      </section>
+
+      <section class="flow">
+        <div class="flow-box">
+          <strong>1. Session Bootstrap</strong>
+          <p>Resume OCR, scenario selection, teammate specialization, initial notes, and two agent threads.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">
+          <strong>2. Turn Orchestration</strong>
+          <p>Candidate messages are rate-limited, persisted, and handed to a Node action for generation.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">
+          <strong>3. Hidden Evaluation</strong>
+          <p>Each turn produces structured annotations, counters, signals, and condensed shared state.</p>
+        </div>
+      </section>
+
+      <section class="content">
+        <div class="stack">
+          <article class="card card-tint">
+            <h2 class="card-title">System Responsibility Split</h2>
+            <p class="summary">
+              Convex is the canonical source of truth for session state, messages, notes, counters,
+              signals, and report artifacts. LLMs are used only for visible dialogue, structured turn
+              analysis, and final report JSON. Next.js owns the interactive room, report UI, OCR
+              ingress, and the server-side PDF route.
+            </p>
+          </article>
+
+          <article class="card">
+            <h2 class="card-title">End-to-End Runtime</h2>
+            <ol class="runtime">
+              <li>
+                <strong>Session creation:</strong> `createSession` builds an interview blueprint,
+                inserts Convex records, seeds scratch notes and workspace content, then creates a
+                dedicated interviewer thread plus teammate thread.
+              </li>
+              <li>
+                <strong>Live interview:</strong> the UI subscribes to room state, messages, streaming
+                partials, notes, and status via Convex queries; candidate sends land in
+                `channels.sendCandidateMessage`.
+              </li>
+              <li>
+                <strong>AI response cycle:</strong> `orchestratorNode.processCandidateTurn` loads
+                cross-channel context, calls the active agent, streams partial output when enabled,
+                persists the visible reply, then runs hidden turn analysis.
+              </li>
+              <li>
+                <strong>Session completion:</strong> `endSession` transitions to
+                `generating_report`, `reportingNode.generateReport` creates structured report JSON,
+                and the report page exposes on-demand PDF export through Playwright.
+              </li>
+            </ol>
+          </article>
+
+          <article class="card">
+            <h2 class="card-title">Implementation Modules</h2>
+            <div class="grid-two">
+              <div class="mini brand-box">
+                <h3>Frontend</h3>
+                <p>`/` session setup, `/interview/[sessionId]` room, `/reports/[sessionId]` report view.</p>
+              </div>
+              <div class="mini accent-box">
+                <h3>Realtime Core</h3>
+                <p>`sessions`, `channels`, `messages`, `streamingResponses`, `signalState`, `scratchNotes`.</p>
+              </div>
+              <div class="mini warn-box">
+                <h3>AI Layer</h3>
+                <p>Interviewer and teammate agents plus structured turn analysis and final report generation.</p>
+              </div>
+              <div class="mini accent-box">
+                <h3>Export Layer</h3>
+                <p>HTML report rendering in Next.js with server-side PDF output generated by Chromium.</p>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="stack">
+          <article class="card">
+            <h2 class="card-title">Core Data Model</h2>
+            <ul>
+              <li><strong>Interview entities:</strong> `sessions`, `channels`, `messages`, `events`.</li>
+              <li><strong>High-churn runtime state:</strong> `agentRuntimeState`, `streamingResponses`, `signalState`.</li>
+              <li><strong>Shared memory:</strong> `sessionState`, `sessionFacts`, `phaseSummaries`.</li>
+              <li><strong>Candidate-private work:</strong> `scratchNotes`, `solutionWorkspaces`.</li>
+              <li><strong>Evaluation outputs:</strong> `annotations`, `metricSnapshots`, `reports`, `reportArtifacts`.</li>
+            </ul>
+          </article>
+
+          <article class="card">
+            <h2 class="card-title">Key Technical Decisions</h2>
+            <dl class="matrix">
+              <dt>Realtime</dt>
+              <dd>Convex subscriptions drive live tabs, timers, notes, and streaming reply state.</dd>
+              <dt>Isolation</dt>
+              <dd>Each visible channel has its own agent thread, but both read the same condensed session context.</dd>
+              <dt>Safety</dt>
+              <dd>Message send rate limiting, explicit public/internal function boundaries, and validator-backed APIs.</dd>
+              <dt>Scalability</dt>
+              <dd>High-write operational state is split into dedicated tables instead of large session blobs.</dd>
+              <dt>Flexibility</dt>
+              <dd>LLM provider can switch between Gemini and OpenRouter without changing orchestration code.</dd>
+            </dl>
+          </article>
+
+          <article class="card card-tint">
+            <h2 class="card-title">Current Scope</h2>
+            <ul>
+              <li>Hackathon-style MVP with public session IDs instead of full authentication.</li>
+              <li>System design interview focus with standardized phases, nudges, stress, and teammate collaboration.</li>
+              <li>Report PDF is rendered on demand today; schema hooks already exist for persisted PDF artifacts.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span><strong>Document basis:</strong> current code in `app/`, `components/`, `convex/`, and supporting docs in this repository.</span>
+        <span><strong>Snapshot date:</strong> 12 April 2026</span>
+      </footer>
+    </main>
+  </body>
+</html>

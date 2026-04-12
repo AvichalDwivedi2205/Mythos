@@ -1,34 +1,56 @@
 import { z } from "zod";
 
+export const visibleResponseModes = [
+  "brief",
+  "probe",
+  "nudge",
+  "challenge",
+  "stress",
+  "close",
+  "collaborate",
+  "clarify_with_interviewer",
+  "observe",
+] as const;
+
+export const visibleResponseBadgeKinds = [
+  "brief",
+  "nudge",
+  "stress",
+  "concern",
+  "clarification",
+  "team",
+  "system",
+] as const;
+
+export const interviewPhaseValues = [
+  "problem_framing",
+  "requirements",
+  "high_level_design",
+  "deep_dive",
+  "stress_and_defense",
+  "wrap_up",
+] as const;
+
 export const visibleAgentResponseSchema = z.object({
-  mode: z.enum([
-    "brief",
-    "probe",
-    "nudge",
-    "challenge",
-    "stress",
-    "close",
-    "collaborate",
-    "clarify_with_interviewer",
-    "observe",
-  ]),
-  badgeKind: z.enum(["brief", "nudge", "stress", "concern", "clarification", "team", "system"]),
+  mode: z.enum(visibleResponseModes),
+  badgeKind: z.enum(visibleResponseBadgeKinds),
   content: z.string().min(8).max(2000),
   eventSummary: z.string().min(3).max(160),
   shouldAdvancePhase: z.boolean().default(false),
-  nextPhase: z
-    .enum([
-      "problem_framing",
-      "requirements",
-      "high_level_design",
-      "deep_dive",
-      "stress_and_defense",
-      "wrap_up",
-    ])
-    .nullable()
-    .default(null),
+  nextPhase: z.enum(interviewPhaseValues).nullable().default(null),
   needsClarification: z.boolean().default(false),
   clarificationQuestion: z.string().nullable().default(null),
+});
+
+export const visibleAgentResponseDraftSchema = z.object({
+  mode: z.string().optional(),
+  badgeKind: z.string().optional(),
+  content: z.string().optional(),
+  eventSummary: z.string().optional(),
+  shouldAdvancePhase: z.boolean().optional(),
+  nextPhase: z.string().nullable().optional(),
+  needsClarification: z.boolean().optional(),
+  clarificationQuestion: z.string().nullable().optional(),
 });
 
 export const turnAnalysisSchema = z.object({

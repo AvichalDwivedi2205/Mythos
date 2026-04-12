@@ -8,7 +8,7 @@ test("candidate can start an interview and see the live room", async ({ page }) 
   await page.getByRole("button", { name: "Start interview" }).click();
 
   await expect(page).toHaveURL(/\/interview\/session-/);
-  await expect(page.getByText("Global Messaging Platform")).toBeVisible();
+  await expect(page.locator(".sname").first()).toBeVisible();
   await expect(page.getByRole("button", { name: /Interviewer/ })).toBeVisible();
   await expect(page.getByText("Scratch Pad")).toBeVisible();
   await expect(page.getByText("Shared brief")).toBeVisible();

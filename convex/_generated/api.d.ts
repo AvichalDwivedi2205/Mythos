@@ -16,6 +16,7 @@ import type * as lib_db from "../lib/db.js";
 import type * as lib_llmProvider from "../lib/llmProvider.js";
 import type * as lib_scenario from "../lib/scenario.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as lib_visibleResponse from "../lib/visibleResponse.js";
 import type * as notes from "../notes.js";
 import type * as orchestrator from "../orchestrator.js";
 import type * as orchestratorNode from "../orchestratorNode.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   "lib/llmProvider": typeof lib_llmProvider;
   "lib/scenario": typeof lib_scenario;
   "lib/validators": typeof lib_validators;
+  "lib/visibleResponse": typeof lib_visibleResponse;
   notes: typeof notes;
   orchestrator: typeof orchestrator;
   orchestratorNode: typeof orchestratorNode;

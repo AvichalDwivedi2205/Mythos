@@ -1,17 +1,6 @@
 import type { Metadata } from "next";
-import { Fraunces, Outfit } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-fraunces",
-});
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-outfit",
-});
 
 export const metadata: Metadata = {
   title: "Aperture",
@@ -24,12 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      data-theme="dark"
-      className={`${fraunces.variable} ${outfit.variable}`}
-    >
+    <html lang="en" suppressHydrationWarning data-theme="dark">
       <body>
         <script
           dangerouslySetInnerHTML={{

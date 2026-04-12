@@ -8,6 +8,8 @@
 
 /* ── Design tokens (UI.md) ── */
 :root {
+  --font-outfit: "Avenir Next", "Inter", "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-fraunces: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --bg: #080a10;
   --glass: rgba(255, 255, 255, 0.055);
   --glass2: rgba(255, 255, 255, 0.09);

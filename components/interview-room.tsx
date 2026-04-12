@@ -4,7 +4,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
-  useMemo,
+  useEffectEvent,
   useRef,
   useState,
   useTransition,
@@ -24,6 +24,7 @@ import { ThemeToggle } from "./theme-toggle";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type ChannelKind = "interviewer" | "teammate";
+type TabUnreadState = Record<ChannelKind, boolean>;
 
 type RoomToast = { id: number; title: string; detail: string };
 
@@ -111,7 +112,10 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   const [solutionExpanded, setSolutionExpanded] = useState(false);
   const [briefExpanded, setBriefExpanded] = useState(false);
   const [toasts, setToasts] = useState<RoomToast[]>([]);
-  const [tabUnread, setTabUnread] = useState({ interviewer: false, teammate: false });
+  const [tabUnread, setTabUnread] = useState<TabUnreadState>({
+    interviewer: false,
+    teammate: false,
+  });
   const solutionSeededRef = useRef(false);
   const notifyBootstrappedRef = useRef(false);
   const lastAgentInterviewerIdRef = useRef<Id<"messages"> | null>(null);
@@ -138,6 +142,40 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       setToasts((list) => list.filter((t) => t.id !== id));
     }, 2000);
   }, []);
+
+  const markTabRead = useEffectEvent((channelKind: ChannelKind) => {
+    setTabUnread((current) =>
+      current[channelKind] ? { ...current, [channelKind]: false } : current,
+    );
+  });
+
+  const handleUnreadReply = useEffectEvent(
+    (channelKind: ChannelKind, title: string, detail: string, notificationBody: string) => {
+      setTabUnread((current) =>
+        current[channelKind] ? current : { ...current, [channelKind]: true },
+      );
+      pushToast(title, detail);
+      if (
+        typeof document !== "undefined" &&
+        document.hidden &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          new Notification(title, {
+            body: notificationBody,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+  );
+
+  const seedSolutionDraft = useEffectEvent((draftContent: string) => {
+    setSolutionDraft(draftContent);
+    solutionSeededRef.current = true;
+  });
 
   const deferredNoteSearch = useDeferredValue(noteSearch);
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
@@ -247,11 +285,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   }, []);
 
   useEffect(() => {
-    if (activeTab === "interviewer") {
-      setTabUnread((s) => ({ ...s, interviewer: false }));
-    } else {
-      setTabUnread((s) => ({ ...s, teammate: false }));
-    }
+    markTabRead(activeTab);
   }, [activeTab]);
 
   useEffect(() => {
@@ -275,22 +309,12 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     if (iv && iv.id !== lastAgentInterviewerIdRef.current) {
       lastAgentInterviewerIdRef.current = iv.id;
       if (activeTab !== "interviewer") {
-        setTabUnread((s) => ({ ...s, interviewer: true }));
-        pushToast("Interviewer replied", "Open the Interviewer tab to read the latest message.");
-        if (
-          typeof document !== "undefined" &&
-          document.hidden &&
-          "Notification" in window &&
-          Notification.permission === "granted"
-        ) {
-          try {
-            new Notification("Interviewer replied", {
-              body: "There is a new message on the interviewer channel.",
-            });
-          } catch {
-            /* ignore */
-          }
-        }
+        handleUnreadReply(
+          "interviewer",
+          "Interviewer replied",
+          "Open the Interviewer tab to read the latest message.",
+          "There is a new message on the interviewer channel.",
+        );
       }
     }
 
@@ -299,25 +323,15 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     if (tm && tm.id !== lastAgentTeammateIdRef.current) {
       lastAgentTeammateIdRef.current = tm.id;
       if (activeTab !== "teammate") {
-        setTabUnread((s) => ({ ...s, teammate: true }));
-        pushToast(`${teammateLabel} replied`, "Open the teammate tab to read the latest message.");
-        if (
-          typeof document !== "undefined" &&
-          document.hidden &&
-          "Notification" in window &&
-          Notification.permission === "granted"
-        ) {
-          try {
-            new Notification(`${teammateLabel} replied`, {
-              body: "There is a new message on the teammate channel.",
-            });
-          } catch {
-            /* ignore */
-          }
-        }
+        handleUnreadReply(
+          "teammate",
+          `${teammateLabel} replied`,
+          "Open the teammate tab to read the latest message.",
+          "There is a new message on the teammate channel.",
+        );
       }
     }
-  }, [interviewerMessages, teammateMessages, activeTab, room, pushToast]);
+  }, [interviewerMessages, teammateMessages, activeTab, room]);
 
   useEffect(() => {
     solutionSeededRef.current = false;
@@ -331,8 +345,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
       return;
     }
     if (!solutionSeededRef.current) {
-      setSolutionDraft(workspace.solution.draftContent);
-      solutionSeededRef.current = true;
+      seedSolutionDraft(workspace.solution.draftContent);
     }
   }, [workspace]);
 
