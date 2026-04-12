@@ -123,6 +123,7 @@ export async function generateVisibleResponse(
   args: {
     channelKind: "interviewer" | "teammate";
     context: GenerationContext;
+    onPartialContent?: (content: string) => Promise<void>;
   },
 ) {
   const prompt = buildVisiblePrompt(args.channelKind, args.context);
@@ -132,12 +133,18 @@ export async function generateVisibleResponse(
     threadId: args.context.threadId,
     userId: args.context.sessionPublicId,
   });
-  const { object } = await thread.generateObject({
-    prompt,
-    schema: visibleAgentResponseSchema,
-  });
-
-  const parsed = visibleAgentResponseSchema.parse(object);
+  const parsed = args.onPartialContent
+    ? visibleAgentResponseSchema.parse(
+        await streamVisibleResponse(thread, prompt, args.onPartialContent),
+      )
+    : visibleAgentResponseSchema.parse(
+        (
+          await thread.generateObject({
+            prompt,
+            schema: visibleAgentResponseSchema,
+          })
+        ).object,
+      );
 
   if (
     args.channelKind === "teammate" &&
@@ -156,6 +163,43 @@ export async function generateVisibleResponse(
   }
 
   return parsed;
+}
+
+async function streamVisibleResponse(
+  thread: Awaited<ReturnType<typeof interviewerAgent.continueThread>>["thread"],
+  prompt: string,
+  onPartialContent: (content: string) => Promise<void>,
+) {
+  const result = await thread.streamObject({
+    prompt,
+    schema: visibleAgentResponseSchema,
+  });
+  let lastContent = "";
+
+  for await (const partial of result.partialObjectStream) {
+    const nextContent = getPartialContent(partial);
+    if (!nextContent || nextContent === lastContent) {
+      continue;
+    }
+
+    lastContent = nextContent;
+    await onPartialContent(nextContent);
+  }
+
+  return await result.object;
+}
+
+function getPartialContent(partial: unknown) {
+  if (
+    typeof partial === "object" &&
+    partial !== null &&
+    "content" in partial &&
+    typeof partial.content === "string"
+  ) {
+    return partial.content;
+  }
+
+  return "";
 }
 
 export async function generateTurnAnalysis(
