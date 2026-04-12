@@ -1,4 +1,9 @@
 import { TEAMMATE_SPECIALIZATIONS, type TeammateSpecialization } from "./constants";
+import {
+  getCanonicalMetricsForTrack,
+  getMessagingMetricsBlock,
+  type MetricTrackId,
+} from "./blueprint-metrics";
 
 export type NoteLabel =
   | "Requirement"
@@ -206,8 +211,16 @@ const scenarioTracks: Record<ScenarioTrackId, ScenarioTrack> = {
       "consumer isolation",
     ],
     clarifications: [
-      clarification("volume", ["volume", "throughput", "events"], "Peak sustained ingest is 5 million events per minute across multiple producers."),
-      clarification("freshness", ["freshness", "sla", "delay"], "Operational consumers want data available within 2 minutes."),
+      clarification(
+        "volume",
+        ["volume", "throughput", "events"],
+        "Peak sustained ingest, burst headroom, and partition counts are exactly as listed under Quantified targets in the problem statement.",
+      ),
+      clarification(
+        "freshness",
+        ["freshness", "sla", "delay"],
+        "Operational vs warehouse freshness and lag targets are exactly as listed under Quantified targets in the problem statement.",
+      ),
       clarification("replay", ["replay", "backfill", "late data"], "Historical replay and backfill are required without breaking downstream consumers."),
       clarification("schema", ["schema", "contracts", "compatibility"], "Schema evolution must be backward compatible for at least one release window."),
       clarification("tenancy", ["tenant", "customer", "workspace"], "The platform is multi-tenant and noisy neighbors are a concern."),
@@ -422,6 +435,8 @@ type SessionVariantPack = {
   problemLead: string;
   objectiveAddon: string;
   constraintBlock: string;
+  /** Exact numeric SLAs for this session (bullet list). */
+  metricsBlock: string;
   stressScenario: string;
   focusLines: string[];
   interviewerBrief: string;
@@ -539,13 +554,16 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
   if (track.id === "messaging") {
     const idx = h % MESSAGING_DEEP_VARIANTS.length;
     const mv = MESSAGING_DEEP_VARIANTS[idx];
+    const { metricsBlock, stressIncident } = getMessagingMetricsBlock(entropy);
     const constraintBlock = mv.constraints.map((c, i) => `${i + 1}. ${c}`).join("\n");
+    const stressScenario = `${mv.stress}\n\nQuantified incident: ${stressIncident}`;
     const interviewerBrief = [
       mv.title,
       `${mv.problemLead} ${track.objective}`,
       ...(mv.objectiveAddon ? [mv.objectiveAddon] : []),
+      `Quantified targets (canonical — use these exact figures in discussion):\n${metricsBlock}`,
       `Requirements:\n${constraintBlock}`,
-      `Failure scenario to stress-test the design:\n${mv.stress}`,
+      `Failure scenario to stress-test the design:\n${stressScenario}`,
     ].join("\n\n");
 
     return {
@@ -554,7 +572,8 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
       problemLead: `${mv.problemLead} ${track.objective}`,
       objectiveAddon: mv.objectiveAddon,
       constraintBlock,
-      stressScenario: mv.stress,
+      metricsBlock,
+      stressScenario,
       focusLines: rotateArray(track.focusAreas, h),
       interviewerBrief,
     };
@@ -562,11 +581,16 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
 
   const idx = h % 3;
   const rotated = rotateArray(track.focusAreas, idx);
+  const { metricsBlock, stressIncident } = getCanonicalMetricsForTrack(
+    track.id as MetricTrackId,
+    entropy,
+  );
   const stressAlt = [
     `${track.stressAngle}`,
     `Escalation: ${track.stressAngle} while a dependent service SLO breaches simultaneously.`,
     `Twist: ${track.stressAngle} with a partial data migration in flight.`,
   ][idx % 3];
+  const stressScenario = `${stressAlt}\n\nQuantified incident: ${stressIncident}`;
 
   const constraintBlock = rotated
     .slice(0, 4)
@@ -576,8 +600,9 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
   const interviewerBrief = [
     track.title,
     track.objective,
+    `Quantified targets (canonical — use these exact figures in discussion):\n${metricsBlock}`,
     `Design focus:\n${constraintBlock}`,
-    `Failure scenario:\n${stressAlt}`,
+    `Failure scenario:\n${stressScenario}`,
   ].join("\n\n");
 
   return {
@@ -586,7 +611,8 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
     problemLead: `${track.title}. ${track.objective}`,
     objectiveAddon: "",
     constraintBlock,
-    stressScenario: stressAlt,
+    metricsBlock,
+    stressScenario,
     focusLines: rotated,
     interviewerBrief,
   };
@@ -621,6 +647,7 @@ export function buildInterviewBlueprint(args: {
   const sharedContextSeed = [
     `Candidate background: ${candidateSummary || "Generalist systems background."}`,
     `Job focus: ${jobFocus || "General distributed systems and architecture depth."}`,
+    `Canonical metrics (do not invent different magnitudes unless negotiating a tradeoff with the candidate):\n${variantPack.metricsBlock}`,
     `Pressure angle: ${variantPack.stressScenario}`,
   ].join("\n");
   const focusAreas = variantPack.focusLines.map((item) => `- ${item}`).join("\n");
@@ -634,6 +661,7 @@ export function buildInterviewBlueprint(args: {
     problemStatement: [
       variantPack.problemLead,
       variantPack.objectiveAddon ? variantPack.objectiveAddon : null,
+      `Quantified targets (canonical for this session):\n${variantPack.metricsBlock}`,
       jobFocus ? `Context from the role: ${jobFocus}` : null,
       candidateSummary ? `Candidate background: ${candidateSummary}` : null,
       variantPack.constraintBlock ? `Requirements:\n${variantPack.constraintBlock}` : null,
@@ -704,7 +732,7 @@ function buildSolutionTemplate(track: ScenarioTrack, roleLevel: string) {
     `## Problem Framing`,
     `- Target role level: ${roleLevel}`,
     `- Primary objective:`,
-    `- Core scale / SLA assumptions:`,
+    `- Core scale / SLA assumptions (use the quantified targets from the brief):`,
     `- Explicitly out of scope:`,
     ``,
     `## Requirements`,

@@ -51,7 +51,9 @@ You may not:
 - leak the hidden rubric
 - say whether the candidate is passing or failing
 
-Scenario-specific framing is supplied in each turn prompt (title, problem statement, job signal, and shared pool context).`;
+Scenario-specific framing is supplied in each turn prompt (title, problem statement, job signal, and shared pool context).
+
+The problem statement and shared pool context include a "Quantified targets" block with concrete numeric SLAs (throughput, latency, retention, cost, error rates, etc.). Treat those figures as canonical for this session: reference them in your questions, nudges, and stress tests. Do not silently substitute different magnitudes unless you are explicitly exploring a tradeoff with the candidate and naming the change.`;
 
 export const interviewerAgent = new Agent(agentComponent, {
   name: "Interviewer Agent",
@@ -78,7 +80,8 @@ You may not:
 - solve the interview for the candidate
 - reveal hidden requirements
 - grade the candidate
-`,
+
+The problem statement includes a "Quantified targets" section with exact numbers. Use those when pressure-testing feasibility, cost, and failure modes; do not invent conflicting scale figures unless you are negotiating a tradeoff.`,
   usageHandler,
   contextOptions: {
     recentMessages: 24,
@@ -227,6 +230,8 @@ export async function generateTurnAnalysis(
 ) {
   const prompt = `You are the hidden evaluation layer for an AI-driven system design interview.
 Return a compact, citation-friendly turn analysis for the candidate-visible interaction below.
+
+When scoring architecture/requirements depth, prefer evidence that the candidate engages with the explicit numeric targets in the problem statement (throughput, latency, retention, SLOs) rather than hand-wavy scale.
 
 Scenario: ${context.title}
 Problem statement:
@@ -392,6 +397,7 @@ Approved clarifications you may reveal:
 ${clarificationList}
 
 Output rules:
+- Anchor challenges to the numeric targets in the problem statement (throughput, latency, retention, cost, SLOs) when relevant.
 - use "nudge" only when redirecting the candidate back toward an important missing piece
 - use "stress" only when deliberately increasing pressure
 - use "brief" only for initial framing or a phase reset
@@ -451,5 +457,5 @@ ${context.workingSolution || "No draft yet."}
 If you genuinely need clarification from the interviewer on scope or constraints, set needsClarification=true and ask one short clarification question.
 Otherwise keep needsClarification=false.
 
-Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate.`;
+Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.`;
 }
