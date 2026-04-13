@@ -24,6 +24,50 @@ export function getLlmProviderId(): LlmProviderId {
   return normalizeProvider(process.env.LLM_PROVIDER);
 }
 
+/**
+ * Next.js `/api/resume-ocr` — follows `LLM_PROVIDER` like Convex.
+ *
+ * - `gemini` (default): `GEMINI_API_KEY`; optional `GEMINI_OCR_MODEL` or `GEMINI_MODEL` (else flash-lite preview).
+ * - `openrouter`: `OPENROUTER_API_KEY`; optional `OPENROUTER_OCR_MODEL` or `OPENROUTER_MODEL` (else `google/gemini-2.5-flash-lite`).
+ */
+export function getResumeOcrLanguageModel() {
+  const provider = getLlmProviderId();
+
+  if (provider === "openrouter") {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "OPENROUTER_API_KEY is required for resume OCR when LLM_PROVIDER=openrouter (set in .env.local).",
+      );
+    }
+    const modelId =
+      process.env.OPENROUTER_OCR_MODEL?.trim() ||
+      process.env.OPENROUTER_MODEL?.trim() ||
+      DEFAULT_OPENROUTER_MODEL;
+    const openrouter = createOpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey,
+      headers: {
+        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "https://mythos.local",
+        "X-Title": process.env.OPENROUTER_APP_TITLE ?? "Mythos",
+      },
+    });
+    return openrouter(modelId);
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY is required for resume OCR when LLM_PROVIDER is gemini (set in .env.local).",
+    );
+  }
+  const modelId =
+    process.env.GEMINI_OCR_MODEL?.trim() ||
+    process.env.GEMINI_MODEL?.trim() ||
+    DEFAULT_GEMINI_MODEL;
+  return createGoogleGenerativeAI({ apiKey })(modelId);
+}
+
 function envWithFallback(
   primaryKey: string,
   fallbackKey: string | null,
