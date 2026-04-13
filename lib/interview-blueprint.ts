@@ -564,7 +564,7 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
       ...(mv.objectiveAddon ? [mv.objectiveAddon] : []),
       `Quantified targets (canonical; use these exact figures in discussion):\n${metricsBlock}`,
       `Requirements:\n${constraintBlock}`,
-      `Failure scenario to stress-test the design:\n${stressScenario}`,
+      `Here's an incident to work through as you design:\n${stressScenario}`,
     ].join("\n\n");
 
     return {
@@ -603,7 +603,7 @@ function buildSessionVariant(track: ScenarioTrack, entropy: string): SessionVari
     track.objective,
     `Quantified targets (canonical; use these exact figures in discussion):\n${metricsBlock}`,
     `Design focus:\n${constraintBlock}`,
-    `Failure scenario:\n${stressScenario}`,
+    `Here's an incident to work through as you design:\n${stressScenario}`,
   ].join("\n\n");
 
   return {
@@ -661,8 +661,8 @@ export function buildInterviewBlueprint(args: {
   const sharedContextSeed = [
     `Candidate background: ${candidateSummary || "Generalist systems background."}`,
     `Job focus: ${jobFocus || "General distributed systems and architecture depth."}`,
-    `Canonical metrics (do not invent different magnitudes unless negotiating a tradeoff with the candidate):\n${variantPack.metricsBlock}`,
-    `Pressure angle: ${variantPack.stressScenario}`,
+    `Canonical metrics for this session:\n${variantPack.metricsBlock}`,
+    `Scenario extension:\n${variantPack.stressScenario}`,
   ].join("\n");
   const focusAreas = variantPack.focusLines.map((item) => `- ${item}`).join("\n");
   const solutionTemplate = buildSolutionTemplate(track, roleLevel);
@@ -680,7 +680,7 @@ export function buildInterviewBlueprint(args: {
       candidateSummary ? `Candidate background: ${candidateSummary}` : null,
       variantPack.constraintBlock ? `Requirements:\n${variantPack.constraintBlock}` : null,
       `Areas to cover:\n${focusAreas}`,
-      `Stress test: ${variantPack.stressScenario}`,
+      `Scenario extension:\n${variantPack.stressScenario}`,
     ]
       .filter(Boolean)
       .join("\n\n"),

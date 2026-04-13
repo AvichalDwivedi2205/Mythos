@@ -418,7 +418,8 @@ function buildConsultingSessionVariant(track: ConsultingScenarioTrack, entropy: 
     `Twist: ${track.stressAngle} while leadership disagrees on the primary success metric.`,
     `Escalation: ${track.stressAngle} and a key exhibit may be incomplete — say what you still need.`,
   ][idx % 3];
-  const stressScenario = `${stressAlt}\n\nConsulting discipline: stay hypothesis-driven; do not jump to a single recommendation without testing alternatives.`;
+  /** In-world complication only; method/rubric lives in agent instructions, not candidate-visible copy. */
+  const stressScenario = stressAlt;
 
   const constraintBlock = rotated
     .slice(0, 4)
@@ -428,10 +429,9 @@ function buildConsultingSessionVariant(track: ConsultingScenarioTrack, entropy: 
   const interviewerBrief = [
     track.title,
     `${track.situationLead} ${track.clientGoal}`,
-    `Exhibit anchors (canonical for this session; use these exact figures unless you are explicitly negotiating a documented tradeoff):\n${metricsBlock}`,
+    `Exhibit anchors (canonical for this session):\n${metricsBlock}`,
     `Exploration focus:\n${constraintBlock}`,
-    `Interviewer pressure scenario:\n${stressScenario}`,
-    `Method expectations: clarify the client problem before structuring; keep frameworks MECE; separate observations from hypotheses; sanity-check math; state risks and what would change your mind.`,
+    `There's another complication to fold into your thinking:\n${stressScenario}`,
   ].join("\n\n");
 
   return {
@@ -525,8 +525,7 @@ export function buildConsultingCaseBlueprint(args: {
     `Candidate background: ${candidateSummary || "General professional background."}`,
     `Role / prep signal: ${jobFocus || "General consulting / strategy interview practice."}`,
     `Exhibit anchors (authoritative for this session):\n${variantPack.metricsBlock}`,
-    `Pressure angle: ${variantPack.stressScenario}`,
-    `Consulting norms: systems thinking, first principles, MECE structure, explicit hypotheses, no premature closure.`,
+    `Additional complication:\n${variantPack.stressScenario}`,
   ].join("\n");
   const focusAreas = variantPack.focusLines.map((item) => `- ${item}`).join("\n");
   const solutionTemplate = buildConsultingSolutionTemplate(track, roleLevel);
@@ -543,7 +542,7 @@ export function buildConsultingCaseBlueprint(args: {
       candidateSummary ? `Candidate background: ${candidateSummary}` : null,
       variantPack.constraintBlock ? `Exploration focus:\n${variantPack.constraintBlock}` : null,
       `Areas to cover:\n${focusAreas}`,
-      `Interviewer pressure: ${variantPack.stressScenario}`,
+      `Additional complication:\n${variantPack.stressScenario}`,
     ]
       .filter(Boolean)
       .join("\n\n"),

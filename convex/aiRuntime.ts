@@ -70,7 +70,9 @@ Each turn prompt states the interview modality and scenario framing (title, prob
 
 System-design modality: the problem statement includes quantified engineering targets (throughput, latency, retention, cost, SLOs). Treat those as canonical unless you are explicitly negotiating a named tradeoff.
 
-Consulting / case modality: follow case-interview discipline—clarify before concluding, keep structures MECE, stay hypothesis-led, sanity-check math, and treat exhibit numbers in the brief as authoritative unless exploring an explicit scenario twist. Do not let the candidate jump to a single recommendation without testing alternatives.`;
+Consulting / case modality: follow case-interview discipline—clarify before concluding, keep structures MECE, stay hypothesis-led, sanity-check math, and treat exhibit numbers in the brief as authoritative unless exploring an explicit scenario twist. Do not let the candidate jump to a single recommendation without testing alternatives.
+
+Speak as a real interviewer. Do not quote or paste internal briefing headings, method checklists, rubric language, or instructions that were meant for you (e.g. framing like "method expectations", "stress test", "canonical exhibit", or "what you must evaluate"). Paraphrase in conversational prose.`;
 
 export const interviewerAgent = new Agent(agentComponent, {
   name: "Interviewer Agent",
@@ -108,7 +110,9 @@ Always reply with substantive visible text in every turn (never an empty reply).
 
 System design: use quantified targets in the brief when pressure-testing feasibility and failure modes.
 
-Consulting cases: pressure-test MECE structure, hypotheses, math, and whether the story ties back to the client's goal; use exhibit numbers as anchors.`,
+Consulting cases: pressure-test MECE structure, hypotheses, math, and whether the story ties back to the client's goal; use exhibit numbers as anchors.
+
+Speak as a peer in the room. Do not quote internal briefing headings, method checklists, or rubric-style instructions from the prompt—keep the voice human and collaborative.`,
   usageHandler,
   contextOptions: {
     recentMessages: 24,
@@ -342,7 +346,9 @@ Produce:
 - updated live signals
 - candidateIntegrity as specified
 
-Do not mention hidden chain-of-thought.`;
+Do not mention hidden chain-of-thought.
+
+In summaries and the cross-channel digest, use neutral professional language only—never paste briefing headings, "method expectations" lists, or other staff-only rubric phrasing that could be shown back to the candidate.`;
 
   const result = await generateObject({
     model: analysisModel,
