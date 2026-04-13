@@ -9,7 +9,7 @@ import { getClarificationAnswer } from "./lib/scenario";
 import {
   reportSchema,
   turnAnalysisSchema,
-  visibleAgentResponseDraftSchema,
+  visibleAgentResponseGenerationSchema,
 } from "./lib/aiSchemas";
 import {
   buildFallbackVisibleResponse,
@@ -23,6 +23,8 @@ const analysisModel = getInterviewLanguageModel("analysis");
 const reportModel = getInterviewLanguageModel("report");
 const agentComponent = components.agent as unknown as AgentComponent;
 const MAX_VISIBLE_RESPONSE_ATTEMPTS = 2;
+/** Gemini often stops early on all-optional object schemas; keep headroom for the required reply body. */
+const VISIBLE_RESPONSE_MAX_OUTPUT_TOKENS = 1536;
 
 const usageHandler: UsageHandler = async (
   ctx,
@@ -47,11 +49,10 @@ const usageHandler: UsageHandler = async (
   });
 };
 
-const INTERVIEWER_AGENT_INSTRUCTIONS = `You are a concise, skeptical but fair system design interviewer.
-You push for assumptions, tradeoffs, and concrete justification. You may nudge the candidate back on track,
+const INTERVIEWER_AGENT_INSTRUCTIONS = `You are a concise, skeptical but fair interviewer for practice sessions that may be either system design or consulting / case study.
+You push for explicit assumptions, justified tradeoffs, and concrete reasoning. You may nudge the candidate back on track,
 but you must not reveal the full answer or hidden rubric.
 
-You are operating in a standardized system-design interview.
 You may:
 - ask clarifying questions
 - answer approved clarifications
@@ -64,9 +65,11 @@ You may not:
 - leak the hidden rubric
 - say whether the candidate is passing or failing
 
-Scenario-specific framing is supplied in each turn prompt (title, problem statement, job signal, and shared pool context).
+Each turn prompt states the interview modality and scenario framing (title, problem statement, job signal, shared pool context).
 
-The problem statement and shared pool context include a "Quantified targets" block with concrete numeric SLAs (throughput, latency, retention, cost, error rates, etc.). Treat those figures as canonical for this session: reference them in your questions, nudges, and stress tests. Do not silently substitute different magnitudes unless you are explicitly exploring a tradeoff with the candidate and naming the change.`;
+System-design modality: the problem statement includes quantified engineering targets (throughput, latency, retention, cost, SLOs). Treat those as canonical unless you are explicitly negotiating a named tradeoff.
+
+Consulting / case modality: follow case-interview discipline—clarify before concluding, keep structures MECE, stay hypothesis-led, sanity-check math, and treat exhibit numbers in the brief as authoritative unless exploring an explicit scenario twist. Do not let the candidate jump to a single recommendation without testing alternatives.`;
 
 export const interviewerAgent = new Agent(agentComponent, {
   name: "Interviewer Agent",
@@ -83,7 +86,7 @@ The product has two candidate-facing chat tabs: this interviewer channel and a s
 export const teammateAgent = new Agent(agentComponent, {
   name: "Teammate Agent",
   languageModel: teammateModel,
-  instructions: `You are the candidate's specialist teammate in a system-design interview (teammate tab only; the interviewer tab is separate).
+  instructions: `You are the candidate's specialist teammate (teammate tab only; the interviewer tab is separate). Sessions may be system design or consulting case study—each turn prompt states the modality.
 The candidate is encouraged to bounce ideas, tradeoffs, and half-formed sketches with you. Short brainstorms and "what if" questions are normal collaboration, not cheating.
 
 You may:
@@ -94,13 +97,15 @@ You may:
 - sound proactive and human, like a sharp peer in the room rather than a passive observer
 
 You may not:
-- dump a complete end-to-end solution that replaces the candidate's own design work
+- dump a complete end-to-end answer that replaces the candidate's own work
 - reveal hidden requirements
 - grade the candidate
 
 Always reply with substantive visible text in every turn (never an empty reply). Keep responses concise.
 
-The problem statement includes a "Quantified targets" section with exact numbers. Use those when pressure-testing feasibility, cost, and failure modes; do not invent conflicting scale figures unless you are negotiating a tradeoff.`,
+System design: use quantified targets in the brief when pressure-testing feasibility and failure modes.
+
+Consulting cases: pressure-test MECE structure, hypotheses, math, and whether the story ties back to the client's goal; use exhibit numbers as anchors.`,
   usageHandler,
   contextOptions: {
     recentMessages: 24,
@@ -109,6 +114,7 @@ The problem statement includes a "Quantified targets" section with exact numbers
 
 type GenerationContext = {
   sessionPublicId: string;
+  interviewKind: "system_design" | "consulting_case";
   title: string;
   subtitle: string;
   jobDescription: string;
@@ -179,7 +185,8 @@ export async function generateVisibleResponse(
         : (
             await thread.generateObject({
               prompt,
-              schema: visibleAgentResponseDraftSchema,
+              schema: visibleAgentResponseGenerationSchema,
+              maxOutputTokens: VISIBLE_RESPONSE_MAX_OUTPUT_TOKENS,
             })
           ).object;
       const parsed = repairVisibleAgentResponse(args.channelKind, rawResponse, {
@@ -231,7 +238,8 @@ async function streamVisibleResponse(
 ) {
   const result = await thread.streamObject({
     prompt,
-    schema: visibleAgentResponseDraftSchema,
+    schema: visibleAgentResponseGenerationSchema,
+    maxOutputTokens: VISIBLE_RESPONSE_MAX_OUTPUT_TOKENS,
   });
   let lastContent = "";
 
@@ -268,10 +276,15 @@ export async function generateTurnAnalysis(
     responseBadgeKind: string;
   },
 ) {
-  const prompt = `You are the hidden evaluation layer for an AI-driven system design interview.
+  const modalityLine =
+    context.interviewKind === "consulting_case"
+      ? `Interview modality: consulting / case study. Weight MECE structure, hypothesis discipline, quantitative checks, and synthesis quality. Treat "architecture" summaries in session state as the evolving case structure / driver logic if they read that way.`
+      : `Interview modality: system design. Weight requirements clarity, architecture depth, and tradeoffs grounded in the quantified targets in the problem statement.`;
+
+  const prompt = `You are the hidden evaluation layer for an AI-driven interview.
 Return a compact, citation-friendly turn analysis for the candidate-visible interaction below.
 
-When scoring architecture/requirements depth, prefer evidence that the candidate engages with the explicit numeric targets in the problem statement (throughput, latency, retention, SLOs) rather than hand-wavy scale.
+${modalityLine}
 
 Scenario: ${context.title}
 Problem statement:
@@ -311,7 +324,7 @@ Live signal values before this turn:
 - Nudges: ${context.signals.nudgesGiven}
 
 Also evaluate candidateIntegrity for the candidate message ONLY (not the agent reply):
-- concernLevel "none" for normal design discussion, including words like "solve" used in a technical sense (e.g. "how would we solve ordering").
+- concernLevel "none" for normal interview discussion, including words like "solve" used in a technical or case-work sense (e.g. "how would we solve ordering" or "how should we size this market").
 - "none" for informal teammate-tab phrasing (e.g. "try solving it", "what would you do", "brainstorm with me") when the candidate is clearly collaborating with the teammate agent, not asking the interviewer for the rubric.
 - "low" for mild pressure on the interview contract (e.g. vague ask to do all the work) without explicit cheating.
 - "medium" only when the candidate clearly asks for the full design, hidden rubric, or ideal answer to be handed to them (especially directed at the interviewer channel or the system as grader).
@@ -336,6 +349,7 @@ Do not mention hidden chain-of-thought.`;
 }
 
 export async function generateFinalReport(args: {
+  interviewKind: "system_design" | "consulting_case";
   sessionTitle: string;
   subtitle: string;
   candidateName: string;
@@ -346,7 +360,14 @@ export async function generateFinalReport(args: {
   currentStateText: string;
   finalSolutionText: string;
 }) {
-  const prompt = `You are generating the final hiring-style report for a standardized AI-led system design interview.
+  const modalityGuide =
+    args.interviewKind === "consulting_case"
+      ? `This was a consulting / case study interview. Evaluate problem clarification, MECE structuring, hypothesis testing, quantitative rigor, and executive synthesis. The final write-up may be a case memo rather than an architecture doc.`
+      : `This was a system design interview. Evaluate requirements, architecture, reliability, and tradeoffs grounded in the quantified targets from the brief.`;
+
+  const prompt = `You are generating the final hiring-style report for a standardized AI-led interview.
+
+${modalityGuide}
 
 Session title: ${args.sessionTitle}
 Subtitle: ${args.subtitle}
@@ -379,6 +400,26 @@ Write a concise, evidence-backed report. Every strength, concern, and notable mo
   return reportSchema.parse(result.object);
 }
 
+function interviewModalityBlock(context: GenerationContext) {
+  if (context.interviewKind === "consulting_case") {
+    return `Interview modality: consulting / case study (strategy case style).
+
+Phase hints:
+- problem_framing: clarify the client situation and objective before structuring.
+- requirements: align on the key question, success metric, and explicit scope.
+- high_level_design: expect a MECE structure / driver tree; probe overlaps and gaps.
+- deep_dive: hypothesis-led analysis with math sense-checks against exhibit anchors.
+- stress_and_defense: challenge assumptions, competitive dynamics, and risks; ask what would change the answer.
+- wrap_up: crisp recommendation, risks, and next steps.
+
+The session-state field "Current architecture summary" may hold the candidate's evolving case structure—interpret it as solution logic, not necessarily systems architecture.`;
+  }
+
+  return `Interview modality: system design.
+
+Quantified engineering targets in the problem statement are canonical for scale, latency, retention, cost, and SLO discussions.`;
+}
+
 function buildVisiblePrompt(
   channelKind: "interviewer" | "teammate",
   context: GenerationContext,
@@ -386,6 +427,36 @@ function buildVisiblePrompt(
   const clarificationList = context.approvedClarifications
     .map((clarification) => `- ${clarification.value}`)
     .join("\n");
+
+  const interviewerOutputRules =
+    context.interviewKind === "consulting_case"
+      ? `- Anchor probes to exhibit anchors and stated figures in the problem statement when testing judgment.
+- If the candidate jumps to a recommendation, nudge back to clarifying questions and a MECE structure.
+- Demand explicit hypotheses and alternatives; discourage premature closure.
+- The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
+- use "nudge" only when redirecting the candidate back toward an important missing piece
+- use "stress" only when deliberately increasing pressure
+- use "brief" only for initial framing or a phase reset
+- otherwise prefer "team" or "clarification" style badges sparingly
+- keep content concise, sharp, and interview-like
+- ask a question whenever possible
+- during deep dive or wrap-up, force the candidate to consolidate the recommendation and key risks
+- never give the full solution`
+      : `- Anchor challenges to the numeric targets in the problem statement (throughput, latency, retention, cost, SLOs) when relevant.
+- The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
+- use "nudge" only when redirecting the candidate back toward an important missing piece
+- use "stress" only when deliberately increasing pressure
+- use "brief" only for initial framing or a phase reset
+- otherwise prefer "team" or "clarification" style badges sparingly
+- keep content concise, sharp, and interview-like
+- ask a question whenever possible
+- during deep dive or wrap-up, occasionally force the candidate to consolidate the final solution
+- never give the full solution`;
+
+  const teammateClosing =
+    context.interviewKind === "consulting_case"
+      ? `Your job is to pressure-test hypotheses, structure, and math, and to collaborate without solving the case for the candidate. Use exhibit anchors from the problem statement when sanity-checking quant work.`
+      : `Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.`;
 
   if (channelKind === "interviewer") {
     return `You are speaking in the candidate-visible interviewer channel.
@@ -406,6 +477,8 @@ ${context.sharedContextSeed || "No shared seed yet."}
 
 Mode: ${context.mode}
 Current phase: ${context.currentPhase}
+
+${interviewModalityBlock(context)}
 
 Candidate latest message (sequence ${context.candidateMessage.sequence}):
 ${context.candidateMessage.content}
@@ -438,16 +511,7 @@ Approved clarifications you may reveal:
 ${clarificationList}
 
 Output rules:
-- Anchor challenges to the numeric targets in the problem statement (throughput, latency, retention, cost, SLOs) when relevant.
-- The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
-- use "nudge" only when redirecting the candidate back toward an important missing piece
-- use "stress" only when deliberately increasing pressure
-- use "brief" only for initial framing or a phase reset
-- otherwise prefer "team" or "clarification" style badges sparingly
-- keep content concise, sharp, and interview-like
-- ask a question whenever possible
-- during deep dive or wrap-up, occasionally force the candidate to consolidate the final solution
-- never give the full solution
+${interviewerOutputRules}
 
 ${buildVisibleResponseOutputContract("interviewer")}`;
   }
@@ -470,6 +534,8 @@ ${context.sharedContextSeed || "No shared seed yet."}
 
 Mode: ${context.mode}
 Current phase: ${context.currentPhase}
+
+${interviewModalityBlock(context)}
 
 Candidate latest message (sequence ${context.candidateMessage.sequence}):
 ${context.candidateMessage.content}
@@ -504,9 +570,9 @@ Otherwise keep needsClarification=false.
 Output rules:
 - This tab is for peer collaboration: the candidate may brainstorm with you; respond with concrete pushback, options, or questions every time.
 - Never return empty content. If the candidate is vague, ask one sharp follow-up.
-- Do not paste a full canonical architecture that replaces their work; stay in "sparring partner" mode.
+- Do not paste a full canonical answer that replaces their work; stay in "sparring partner" mode.
 
-Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.
+${teammateClosing}
 
 ${buildVisibleResponseOutputContract("teammate")}`;
 }

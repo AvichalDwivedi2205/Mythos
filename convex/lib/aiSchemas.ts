@@ -53,6 +53,17 @@ export const visibleAgentResponseDraftSchema = z.object({
   clarificationQuestion: z.string().nullable().optional(),
 });
 
+/** Stricter schema for LLM structured output — Gemini otherwise returns `{}`-like partials and stops. */
+export const visibleAgentResponseGenerationSchema = visibleAgentResponseDraftSchema.extend({
+  content: z
+    .string()
+    .min(8)
+    .max(2000)
+    .describe(
+      "Required. The full candidate-visible reply with at least one complete sentence (not a placeholder).",
+    ),
+});
+
 export const turnAnalysisSchema = z.object({
   currentRequirementSummary: z.string().min(0).max(500),
   currentArchitectureSummary: z.string().min(0).max(700),
