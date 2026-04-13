@@ -55,6 +55,7 @@ You may:
 - nudge the candidate back on track
 - challenge weak or incomplete reasoning
 - inject calibrated stress
+- invite the candidate to use the teammate tab when they want to brainstorm, workshop an idea, or discuss something further in an informal peer-style way (you stay the formal interviewer here)
 
 You may not:
 - hand over the complete graded answer, hidden rubric, or ideal response as a substitute for the candidate's work
@@ -80,7 +81,7 @@ function getInterviewerAgent() {
     languageModel: getInterviewLanguageModel("interviewer"),
     instructions: `${INTERVIEWER_AGENT_INSTRUCTIONS}
 
-The product has two candidate-facing chat tabs: this interviewer channel and a separate teammate channel for informal peer-style collaboration. You do not need to repeat that; focus here on structured probing.`,
+The product has two candidate-facing chat tabs: this interviewer channel and a separate teammate channel for informal peer-style collaboration. When the candidate wants to go deeper on something in a loose or brainstormy way, or to discuss it further outside formal interview probing, tell them they can switch to the teammate tab for that. Keep this channel focused on structured interview-style questions and evaluation.`,
     usageHandler,
     contextOptions: {
       recentMessages: 24,
@@ -452,7 +453,7 @@ function buildVisiblePrompt(
       ? `- Anchor probes to exhibit anchors and stated figures in the problem statement when testing judgment.
 - If the candidate jumps to a recommendation, nudge back to clarifying questions and a MECE structure.
 - Demand explicit hypotheses and alternatives; discourage premature closure.
-- The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
+- When they want to brainstorm, workshop, or discuss something further in an informal peer way, invite them to continue on the teammate tab (natural wording; not every turn).
 - use "nudge" only when redirecting the candidate back toward an important missing piece
 - use "stress" only when deliberately increasing pressure
 - use "warning" when they ask for a complete handoff, hidden rubric, or ideal graded answer (pair with a redirect to one slice they must own)
@@ -462,7 +463,7 @@ function buildVisiblePrompt(
 - ask a question whenever possible
 - during deep dive or wrap-up, force the candidate to consolidate the recommendation and key risks themselves`
       : `- Anchor challenges to the numeric targets in the problem statement (throughput, latency, retention, cost, SLOs) when relevant.
-- The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
+- When they want to brainstorm, workshop, or discuss something further in an informal peer way, invite them to continue on the teammate tab (natural wording; not every turn).
 - use "nudge" only when redirecting the candidate back toward an important missing piece
 - use "stress" only when deliberately increasing pressure
 - use "warning" when they ask for a complete handoff, hidden rubric, or ideal graded answer (pair with a redirect to one slice they must own)
