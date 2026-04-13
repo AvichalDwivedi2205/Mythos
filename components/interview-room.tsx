@@ -5,6 +5,7 @@ import {
   useDeferredValue,
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -15,7 +16,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { PHASES, TEAMMATE_SPECIALIZATIONS, type InterviewPhase } from "@/lib/constants";
+import {
+  INTERVIEW_KIND_LABELS,
+  PHASES,
+  TEAMMATE_SPECIALIZATIONS,
+  type InterviewPhase,
+} from "@/lib/constants";
 import { computeTimedPhaseFromSession } from "@/lib/timed-phase";
 import { formatPhaseLabel, formatSessionElapsed, formatTimer } from "@/lib/utils";
 import { ShellTopbar } from "./shell-topbar";
@@ -181,6 +187,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const signalsRef = useRef<HTMLButtonElement | null>(null);
   const scratchComposerRef = useRef<HTMLDivElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const room = useQuery(api.sessions.getRoom, { sessionPublicId });
   const workspace = useQuery(api.workspace.getSharedWorkspace, { sessionPublicId });
@@ -222,6 +229,16 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useLayoutEffect(() => {
+    const el = composerTextareaRef.current;
+    if (!el) {
+      return;
+    }
+    el.style.height = "0px";
+    const cap = Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.38));
+    el.style.height = `${Math.max(cap, 80)}px`;
+  }, [draftInterviewer, draftTeammate, activeTab]);
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
@@ -570,6 +587,11 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
   const phaseNum = PHASES.indexOf(displayPhase) + 1;
   const teammateName = room.channels[1]?.agentRole ?? "Teammate";
   const teammateTabLabel = `${teammateName} · ${teammateMeta.shortLabel}`;
+  const interviewKindLabel = INTERVIEW_KIND_LABELS[room.interviewKind];
+  const interviewerChannelHint =
+    room.interviewKind === "consulting_case"
+      ? `Interviewer channel · ${interviewKindLabel} · ${formatModeLabel(room.mode)} mode · Rubric ${room.rubricVersion} · Phases follow a case flow (clarify → structure → analyze → defend → recommend). Use the teammate tab to pressure-test logic and math.`
+      : `Interviewer channel · ${interviewKindLabel} · ${formatModeLabel(room.mode)} mode · Rubric ${room.rubricVersion} · Use the teammate tab to brainstorm tradeoffs with your specialist peer.`;
 
   return (
     <main className="page-shell page-shell--interview">
@@ -760,7 +782,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             <div>
               <div className="sname">{room.title}</div>
               <div className="ssub">
-                {room.subtitle} · {room.candidateName}
+                {interviewKindLabel} · {room.subtitle} · {room.candidateName}
               </div>
             </div>
             <div className="pchip">
@@ -806,7 +828,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
               <div className="sysln">
                 <span>
                   {activeTab === "interviewer"
-                    ? `Interviewer channel · ${formatModeLabel(room.mode)} mode · Rubric ${room.rubricVersion} · Use the teammate tab to brainstorm tradeoffs with your specialist peer.`
+                    ? interviewerChannelHint
                     : `${teammateName} · ${room.channels[1]?.specialization ?? teammateMeta.label} · Teammate channel · Bounce ideas and risks here; switch to Interviewer for formal probes.`}
                 </span>
               </div>
@@ -851,6 +873,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
             >
               <div className="inpr">
                 <textarea
+                  ref={composerTextareaRef}
                   className={`inp inp--${activeTab === "interviewer" ? "interviewer" : "teammate"}`}
                   value={activeTab === "interviewer" ? draftInterviewer : draftTeammate}
                   onChange={(event) =>
@@ -865,7 +888,8 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                       ? "Reply to interviewer…"
                       : `Reply to ${teammateName}…`
                   }
-                  rows={1}
+                  rows={3}
+                  spellCheck
                 />
                 <button
                   className={`snd${activeTab === "teammate" ? " bl" : ""}`}

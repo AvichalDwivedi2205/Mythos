@@ -1461,6 +1461,14 @@ button {
   transition: border-color 0.2s;
 }
 
+/* Interview room composer: multi-line reply with auto-grow (JS sets height up to cap) */
+.composer .inp {
+  min-height: 80px;
+  max-height: min(38vh, 280px);
+  overflow-y: auto;
+  align-self: stretch;
+}
+
 .inp::placeholder,
 .composer .text-area::placeholder {
   color: var(--txt3);

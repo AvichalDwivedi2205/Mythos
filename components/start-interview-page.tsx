@@ -4,11 +4,29 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { MODES, PHASES, type InterviewMode } from "@/lib/constants";
+import {
+  INTERVIEW_KIND_LABELS,
+  INTERVIEW_KINDS,
+  MODES,
+  PHASES,
+  type InterviewKind,
+  type InterviewMode,
+} from "@/lib/constants";
 import { formatPhaseLabel } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { buildInterviewBlueprint, makeResumeProfile } from "@/lib/interview-blueprint";
-import { INTERVIEW_JOB_DESCRIPTION } from "@/lib/interview-config";
+import { getJobDescriptionForInterviewKind } from "@/lib/interview-config";
+
+const interviewKindCopy: Record<InterviewKind, { short: string; detail: string }> = {
+  system_design: {
+    short: INTERVIEW_KIND_LABELS.system_design,
+    detail: "Technical system design scenarios with quantified scale targets.",
+  },
+  consulting_case: {
+    short: INTERVIEW_KIND_LABELS.consulting_case,
+    detail: "Strategy-style cases: clarify, structure (MECE), hypothesize, quantify, synthesize.",
+  },
+};
 
 const modeCopy: Record<InterviewMode, { short: string; detail: string }> = {
   assessment: {
@@ -31,22 +49,30 @@ export function StartInterviewPage() {
   const [isPending, startTransition] = useTransition();
   const [candidateName, setCandidateName] = useState("Avi");
   const [mode, setMode] = useState<InterviewMode>("practice");
+  const [interviewKind, setInterviewKind] = useState<InterviewKind>("system_design");
   const [resumeText, setResumeText] = useState("");
   const [resumeSummary, setResumeSummary] = useState("");
   const [resumeFileName, setResumeFileName] = useState<string | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const roleDescription = useMemo(
+    () => getJobDescriptionForInterviewKind(interviewKind),
+    [interviewKind],
+  );
+
   const blueprintPreview = useMemo(() => {
     return buildInterviewBlueprint({
       candidateName: candidateName.trim() || "Candidate",
-      jobDescription: INTERVIEW_JOB_DESCRIPTION,
+      jobDescription: roleDescription,
       resumeSummary,
       resumeText,
       teammateSpecializationOverride: null,
-      sessionEntropy: `preview-${candidateName.length}-${resumeSummary.length}-${resumeText.length}-${resumeSummary.slice(0, 12)}`,
+      interviewKind,
+      // Preview must not depend on candidate name; only JD + resume shape the scenario.
+      sessionEntropy: `preview-${resumeSummary.length}-${resumeText.length}-${resumeSummary.slice(0, 12)}`,
     });
-  }, [candidateName, resumeSummary, resumeText]);
+  }, [candidateName, interviewKind, resumeSummary, resumeText, roleDescription]);
 
   async function onResumeFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -105,7 +131,8 @@ export function StartInterviewPage() {
         const result = await createSession({
           candidateName: candidateName.trim() || "Candidate",
           mode,
-          jobDescription: INTERVIEW_JOB_DESCRIPTION,
+          interviewKind,
+          jobDescription: roleDescription,
           resumeText: resumeText.trim(),
           resumeSummary: resumeSummary.trim() || resumeText.trim().slice(0, 600),
           ...(resumeFileName?.trim() ? { resumeFileName: resumeFileName.trim() } : {}),
@@ -142,7 +169,7 @@ export function StartInterviewPage() {
                 </div>
               </div>
               <div className="agr" style={{ paddingLeft: 28 }}>
-                {blueprintPreview.subtitle} · matched from JD + resume
+                {blueprintPreview.subtitle} · matched from interview type + JD + resume
               </div>
             </div>
           </div>
@@ -229,8 +256,25 @@ export function StartInterviewPage() {
             <form className="msgs setup-form" id="mi" onSubmit={onSubmit}>
               <div className="sysln">
                 <span>
-                  Session setup · Problem is generated from your job description and resume · Rubric v3.0
+                  Session setup · Scenario from interview type, role description, and resume · Rubric v3.0
                 </span>
+              </div>
+
+              <div className="phdiv">Interview type</div>
+              <div className="setup-section">
+                <div className="setup-choice-grid">
+                  {INTERVIEW_KINDS.map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      className={`setup-choice${interviewKind === k ? " setup-choice--on" : ""}`}
+                      onClick={() => setInterviewKind(k)}
+                    >
+                      <div className="setup-choice__pill">{interviewKindCopy[k].short}</div>
+                      <div className="setup-choice__detail">{interviewKindCopy[k].detail}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="setup-section">
@@ -273,7 +317,7 @@ export function StartInterviewPage() {
                     cursor: "default",
                   }}
                 >
-                  {INTERVIEW_JOB_DESCRIPTION}
+                  {roleDescription}
                 </div>
               </div>
 
@@ -339,6 +383,8 @@ export function StartInterviewPage() {
                 <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 12, color: "var(--txt2)" }}>
                     Candidate: <strong style={{ color: "var(--txt)" }}>{candidateName || "-"}</strong>
+                    {" · "}Type:{" "}
+                    <strong style={{ color: "var(--txt)" }}>{interviewKindCopy[interviewKind].short}</strong>
                     {" · "}Mode:{" "}
                     <strong style={{ color: "var(--sage)" }}>{modeCopy[mode].short}</strong>
                     {" · "}Teammate:{" "}
