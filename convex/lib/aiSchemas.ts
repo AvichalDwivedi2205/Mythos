@@ -71,7 +71,8 @@ export const turnAnalysisSchema = z.object({
   latestRiskSummary: z.string().min(0).max(500),
   latestInterviewerChallenge: z.string().min(0).max(300),
   latestTeammateConcern: z.string().min(0).max(300),
-  latestCrossChannelDigest: z.string().min(0).max(700),
+  /** Short shared-room snapshot; cap raised so evaluators can compress long briefs without failing validation. */
+  latestCrossChannelDigest: z.string().min(0).max(2048),
   extractedFacts: z.array(
     z.object({
       kind: z.enum([

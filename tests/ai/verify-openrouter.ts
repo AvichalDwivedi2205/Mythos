@@ -5,7 +5,7 @@
  *   OPENROUTER_API_KEY=sk-or-... bunx tsx tests/ai/verify-openrouter.ts
  *
  * Or rely on .env / .env.local (loaded below). Optional:
- *   OPENROUTER_MODEL=google/gemini-2.5-flash-lite
+ *   OPENROUTER_MODEL=google/gemini-3.1-flash-lite-preview
  *
  * Exit 0: checks passed or skipped (no key).
  * Exit 1: API error or empty/invalid response.
@@ -40,7 +40,7 @@ for (const fileName of [".env", ".env.local"]) {
   }
 }
 
-const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
+const DEFAULT_MODEL = "google/gemini-3.1-flash-lite-preview";
 
 function buildOpenRouterModel() {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -56,7 +56,7 @@ function buildOpenRouterModel() {
     },
   });
   const modelId = process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL;
-  return openrouter(modelId as string);
+  return openrouter.chat(modelId as string);
 }
 
 async function main() {

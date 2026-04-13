@@ -1,6 +1,6 @@
 "use node";
 
-import { Agent, type AgentComponent, type UsageHandler } from "@convex-dev/agent";
+import { Agent, type AgentComponent, type Thread, type UsageHandler } from "@convex-dev/agent";
 import { generateObject } from "ai";
 import { components, internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
@@ -17,10 +17,6 @@ import {
   repairVisibleAgentResponse,
 } from "./lib/visibleResponse";
 
-const interviewerModel = getInterviewLanguageModel("interviewer");
-const teammateModel = getInterviewLanguageModel("teammate");
-const analysisModel = getInterviewLanguageModel("analysis");
-const reportModel = getInterviewLanguageModel("report");
 const agentComponent = components.agent as unknown as AgentComponent;
 const MAX_VISIBLE_RESPONSE_ATTEMPTS = 2;
 /** Gemini often stops early on all-optional object schemas; keep headroom for the required reply body. */
@@ -74,22 +70,30 @@ Consulting / case modality: follow case-interview discipline—clarify before co
 
 Speak as a real interviewer. Do not quote or paste internal briefing headings, method checklists, rubric language, or instructions that were meant for you (e.g. framing like "method expectations", "stress test", "canonical exhibit", or "what you must evaluate"). Paraphrase in conversational prose.`;
 
-export const interviewerAgent = new Agent(agentComponent, {
-  name: "Interviewer Agent",
-  languageModel: interviewerModel,
-  instructions: `${INTERVIEWER_AGENT_INSTRUCTIONS}
+/** Lazy init: Convex must read `LLM_PROVIDER` at runtime (not when the bundle first loads). */
+let interviewerAgentInstance: Agent | undefined;
+let teammateAgentInstance: Agent | undefined;
+
+function getInterviewerAgent() {
+  interviewerAgentInstance ??= new Agent(agentComponent, {
+    name: "Interviewer Agent",
+    languageModel: getInterviewLanguageModel("interviewer"),
+    instructions: `${INTERVIEWER_AGENT_INSTRUCTIONS}
 
 The product has two candidate-facing chat tabs: this interviewer channel and a separate teammate channel for informal peer-style collaboration. You do not need to repeat that; focus here on structured probing.`,
-  usageHandler,
-  contextOptions: {
-    recentMessages: 24,
-  },
-});
+    usageHandler,
+    contextOptions: {
+      recentMessages: 24,
+    },
+  });
+  return interviewerAgentInstance;
+}
 
-export const teammateAgent = new Agent(agentComponent, {
-  name: "Teammate Agent",
-  languageModel: teammateModel,
-  instructions: `You are the candidate's specialist teammate (teammate tab only; the interviewer tab is separate). Sessions may be system design or consulting case study—each turn prompt states the modality.
+function getTeammateAgent() {
+  teammateAgentInstance ??= new Agent(agentComponent, {
+    name: "Teammate Agent",
+    languageModel: getInterviewLanguageModel("teammate"),
+    instructions: `You are the candidate's specialist teammate (teammate tab only; the interviewer tab is separate). Sessions may be system design or consulting case study—each turn prompt states the modality.
 The candidate is encouraged to bounce ideas, tradeoffs, and half-formed sketches with you. Short brainstorms and "what if" questions are normal collaboration, not cheating.
 
 You may:
@@ -113,11 +117,13 @@ System design: use quantified targets in the brief when pressure-testing feasibi
 Consulting cases: pressure-test MECE structure, hypotheses, math, and whether the story ties back to the client's goal; use exhibit numbers as anchors.
 
 Speak as a peer in the room. Do not quote internal briefing headings, method checklists, or rubric-style instructions from the prompt—keep the voice human and collaborative.`,
-  usageHandler,
-  contextOptions: {
-    recentMessages: 24,
-  },
-});
+    usageHandler,
+    contextOptions: {
+      recentMessages: 24,
+    },
+  });
+  return teammateAgentInstance;
+}
 
 type GenerationContext = {
   sessionPublicId: string;
@@ -176,7 +182,7 @@ export async function generateVisibleResponse(
   },
 ) {
   const prompt = buildVisiblePrompt(args.channelKind, args.context);
-  const agent = args.channelKind === "interviewer" ? interviewerAgent : teammateAgent;
+  const agent = args.channelKind === "interviewer" ? getInterviewerAgent() : getTeammateAgent();
   const { thread } = await agent.continueThread(ctx, {
     threadId: args.context.threadId,
     userId: args.context.sessionPublicId,
@@ -240,7 +246,7 @@ export async function generateVisibleResponse(
 }
 
 async function streamVisibleResponse(
-  thread: Awaited<ReturnType<typeof interviewerAgent.continueThread>>["thread"],
+  thread: Thread<never>,
   prompt: string,
   onPartialContent: (content: string) => Promise<void>,
 ) {
@@ -346,12 +352,14 @@ Produce:
 - updated live signals
 - candidateIntegrity as specified
 
+latestCrossChannelDigest: synthesize a tight cross-tab snapshot (candidate progress, open threads, key numbers if any)—aim under ~900 characters; never paste the full problem statement or metrics block verbatim.
+
 Do not mention hidden chain-of-thought.
 
 In summaries and the cross-channel digest, use neutral professional language only—never paste briefing headings, "method expectations" lists, or other staff-only rubric phrasing that could be shown back to the candidate.`;
 
   const result = await generateObject({
-    model: analysisModel,
+    model: getInterviewLanguageModel("analysis"),
     prompt,
     schema: turnAnalysisSchema,
   });
@@ -403,7 +411,7 @@ ${args.transcriptText}
 Write a concise, evidence-backed report. Every strength, concern, and notable moment must tie to a concrete sequence number from the transcript.`;
 
   const result = await generateObject({
-    model: reportModel,
+    model: getInterviewLanguageModel("report"),
     prompt,
     schema: reportSchema,
   });

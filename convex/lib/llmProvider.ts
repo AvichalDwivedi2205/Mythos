@@ -5,7 +5,7 @@ export type LlmProviderId = "gemini" | "openrouter";
 export type InterviewLlmRole = "interviewer" | "teammate" | "analysis" | "report";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
-const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite";
+const DEFAULT_OPENROUTER_MODEL = "google/gemini-3.1-flash-lite-preview";
 
 function normalizeProvider(raw: string | undefined): LlmProviderId {
   const v = (raw ?? "gemini").trim().toLowerCase();
@@ -21,49 +21,53 @@ function normalizeProvider(raw: string | undefined): LlmProviderId {
 }
 
 export function getLlmProviderId(): LlmProviderId {
-  return normalizeProvider(process.env.LLM_PROVIDER);
+  // Bracket access so Convex/esbuild does not replace `process.env.LLM_PROVIDER` at bundle time.
+  return normalizeProvider(process.env["LLM_PROVIDER"]);
 }
 
 /**
  * Next.js `/api/resume-ocr` — follows `LLM_PROVIDER` like Convex.
  *
  * - `gemini` (default): `GEMINI_API_KEY`; optional `GEMINI_OCR_MODEL` or `GEMINI_MODEL` (else flash-lite preview).
- * - `openrouter`: `OPENROUTER_API_KEY`; optional `OPENROUTER_OCR_MODEL` or `OPENROUTER_MODEL` (else `google/gemini-2.5-flash-lite`).
+ * - `openrouter`: `OPENROUTER_API_KEY`; optional `OPENROUTER_OCR_MODEL` or `OPENROUTER_MODEL` (else `google/gemini-3.1-flash-lite-preview`).
  */
 export function getResumeOcrLanguageModel() {
   const provider = getLlmProviderId();
 
   if (provider === "openrouter") {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env["OPENROUTER_API_KEY"];
     if (!apiKey) {
       throw new Error(
         "OPENROUTER_API_KEY is required for resume OCR when LLM_PROVIDER=openrouter (set in .env.local).",
       );
     }
     const modelId =
-      process.env.OPENROUTER_OCR_MODEL?.trim() ||
-      process.env.OPENROUTER_MODEL?.trim() ||
+      process.env["OPENROUTER_OCR_MODEL"]?.trim() ||
+      process.env["OPENROUTER_MODEL"]?.trim() ||
       DEFAULT_OPENROUTER_MODEL;
     const openrouter = createOpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey,
       headers: {
-        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "https://mythos.local",
-        "X-Title": process.env.OPENROUTER_APP_TITLE ?? "Mythos",
+        "HTTP-Referer": process.env["OPENROUTER_HTTP_REFERER"] ?? "https://mythos.local",
+        "X-Title": process.env["OPENROUTER_APP_TITLE"] ?? "Mythos",
       },
     });
-    return openrouter(modelId);
+    // Use `.chat()` so requests go to `/v1/chat/completions`. The default callable
+    // `openrouter(modelId)` uses OpenAI Responses API (`/v1/responses`), which OpenRouter
+    // rejects for many models (e.g. Gemini) with "Invalid Responses API request".
+    return openrouter.chat(modelId);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env["GEMINI_API_KEY"];
   if (!apiKey) {
     throw new Error(
       "GEMINI_API_KEY is required for resume OCR when LLM_PROVIDER is gemini (set in .env.local).",
     );
   }
   const modelId =
-    process.env.GEMINI_OCR_MODEL?.trim() ||
-    process.env.GEMINI_MODEL?.trim() ||
+    process.env["GEMINI_OCR_MODEL"]?.trim() ||
+    process.env["GEMINI_MODEL"]?.trim() ||
     DEFAULT_GEMINI_MODEL;
   return createGoogleGenerativeAI({ apiKey })(modelId);
 }
@@ -177,11 +181,11 @@ export function getInterviewLanguageModel(role: InterviewLlmRole = "interviewer"
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: config.apiKey,
       headers: {
-        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER ?? "https://mythos.local",
-        "X-Title": process.env.OPENROUTER_APP_TITLE ?? "Mythos",
+        "HTTP-Referer": process.env["OPENROUTER_HTTP_REFERER"] ?? "https://mythos.local",
+        "X-Title": process.env["OPENROUTER_APP_TITLE"] ?? "Mythos",
       },
     });
-    return openrouter(config.modelId);
+    return openrouter.chat(config.modelId);
   }
 
   if (!config.apiKey) {
