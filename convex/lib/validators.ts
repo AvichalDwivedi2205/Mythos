@@ -6,6 +6,11 @@ export const modeValidator = v.union(
   v.literal("coaching"),
 );
 
+export const interviewKindValidator = v.union(
+  v.literal("system_design"),
+  v.literal("consulting_case"),
+);
+
 export const phaseValidator = v.union(
   v.literal("problem_framing"),
   v.literal("requirements"),
@@ -204,6 +209,7 @@ export const workspaceNotificationValidator = v.object({
 
 export const sharedWorkspaceValidator = v.object({
   sessionPublicId: v.string(),
+  interviewKind: interviewKindValidator,
   jobDescription: v.string(),
   resumeSummary: v.string(),
   problemStatement: v.string(),
@@ -221,6 +227,7 @@ export const sharedWorkspaceValidator = v.object({
 
 export const roomValidator = v.object({
   sessionPublicId: v.string(),
+  interviewKind: interviewKindValidator,
   title: v.string(),
   subtitle: v.string(),
   candidateName: v.string(),

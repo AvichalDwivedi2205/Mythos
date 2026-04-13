@@ -30,6 +30,7 @@ export const getSharedWorkspace = query({
 
     return {
       sessionPublicId: session.publicId,
+      interviewKind: session.interviewKind ?? "system_design",
       jobDescription: session.jobDescription ?? "",
       resumeSummary: session.resumeSummary ?? "",
       problemStatement: session.problemStatement ?? "",

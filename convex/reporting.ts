@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { getReportBySessionId, getSolutionWorkspace } from "./lib/db";
-import { recommendationValidator } from "./lib/validators";
+import { interviewKindValidator, recommendationValidator } from "./lib/validators";
 
 const reportContextValidator = v.object({
   sessionPublicId: v.string(),
+  interviewKind: interviewKindValidator,
   sessionTitle: v.string(),
   subtitle: v.string(),
   candidateName: v.string(),
@@ -102,6 +103,7 @@ export const getReportContext = internalQuery({
 
     return {
       sessionPublicId: session.publicId,
+      interviewKind: session.interviewKind ?? "system_design",
       sessionTitle: session.title,
       subtitle: session.subtitle,
       candidateName: session.candidateName,

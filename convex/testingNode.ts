@@ -30,6 +30,7 @@ export const aiSmokeTest = action({
 
     const baseContext = {
       sessionPublicId: "test-session",
+      interviewKind: "system_design" as const,
       title: "Real-Time Chat at Scale",
       subtitle: "System Design · Senior Engineer",
       jobDescription: "Senior backend: real-time messaging and presence.",
@@ -89,7 +90,10 @@ export const aiSmokeTest = action({
 
     const teammate = await generateVisibleResponse(ctx, {
       channelKind: "teammate",
-      context: baseContext,
+      context: {
+        ...baseContext,
+        threadId: teammateThreadId,
+      },
     });
 
     const analysis = await generateTurnAnalysis(baseContext, {
@@ -98,6 +102,7 @@ export const aiSmokeTest = action({
     });
 
     const report = await generateFinalReport({
+      interviewKind: baseContext.interviewKind,
       sessionTitle: baseContext.title,
       subtitle: baseContext.subtitle,
       candidateName: baseContext.candidateName,

@@ -9,6 +9,7 @@ import {
 import {
   approvedClarificationValidator,
   channelKindValidator,
+  interviewKindValidator,
   phaseValidator,
   streamingResponseStatusValidator,
 } from "./lib/validators";
@@ -18,6 +19,7 @@ import { computeTimedPhaseFromSession } from "../lib/timed-phase";
 
 const processingContextValidator = v.object({
   sessionPublicId: v.string(),
+  interviewKind: interviewKindValidator,
   title: v.string(),
   subtitle: v.string(),
   jobDescription: v.string(),
@@ -119,6 +121,7 @@ export const getProcessingContext = internalQuery({
 
     return {
       sessionPublicId: session.publicId,
+      interviewKind: session.interviewKind ?? "system_design",
       title: session.title,
       subtitle: session.subtitle,
       jobDescription: session.jobDescription ?? "",

@@ -10,6 +10,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { getReportBySessionId, getSessionByPublicId, getSessionCounters, getSignalState } from "./lib/db";
 import {
+  interviewKindValidator,
   modeValidator,
   roomValidator,
   sessionStatusValidator,
@@ -23,6 +24,7 @@ export const createSession = mutation({
   args: {
     candidateName: v.string(),
     mode: modeValidator,
+    interviewKind: v.optional(interviewKindValidator),
     jobDescription: v.string(),
     resumeText: v.string(),
     resumeSummary: v.string(),
@@ -36,6 +38,7 @@ export const createSession = mutation({
     const now = Date.now();
     const publicId = createPublicId("session");
     const candidateName = args.candidateName.trim() || "Candidate";
+    const interviewKind = args.interviewKind ?? "system_design";
     const blueprint = buildInterviewBlueprint({
       candidateName,
       jobDescription: args.jobDescription,
@@ -43,12 +46,14 @@ export const createSession = mutation({
       resumeText: args.resumeText,
       teammateSpecializationOverride: args.teammateSpecialization ?? null,
       sessionEntropy: publicId,
+      interviewKind,
     });
 
     const sessionId = await ctx.db.insert("sessions", {
       publicId,
       candidateName,
       mode: args.mode,
+      interviewKind,
       status: "active",
       scenarioId: blueprint.scenarioId,
       scenarioVersion: new Date(now).toISOString().slice(0, 10),
@@ -289,6 +294,7 @@ export const getRoom = query({
 
     return {
       sessionPublicId: session.publicId,
+      interviewKind: session.interviewKind ?? "system_design",
       title: session.title,
       subtitle: session.subtitle,
       candidateName: session.candidateName,
