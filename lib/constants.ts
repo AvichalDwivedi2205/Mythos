@@ -1,6 +1,14 @@
 export const DEFAULT_SCENARIO_ID = "real-time-chat-at-scale" as const;
 export const DEFAULT_TIME_BUDGET_MS = 30 * 60 * 1000;
 
+export const INTERVIEW_KINDS = ["system_design", "consulting_case"] as const;
+export type InterviewKind = (typeof INTERVIEW_KINDS)[number];
+
+export const INTERVIEW_KIND_LABELS: Record<InterviewKind, string> = {
+  system_design: "System design",
+  consulting_case: "Consulting / case study",
+};
+
 export const PHASES = [
   "problem_framing",
   "requirements",

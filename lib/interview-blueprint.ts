@@ -1,4 +1,5 @@
-import { TEAMMATE_SPECIALIZATIONS, type TeammateSpecialization } from "./constants";
+import { TEAMMATE_SPECIALIZATIONS, type InterviewKind, type TeammateSpecialization } from "./constants";
+import { buildConsultingCaseBlueprint } from "./consulting-case-blueprint";
 import {
   getCanonicalMetricsForTrack,
   getMessagingMetricsBlock,
@@ -626,7 +627,20 @@ export function buildInterviewBlueprint(args: {
   resumeText: string;
   teammateSpecializationOverride?: TeammateSpecialization | null;
   sessionEntropy?: string;
+  interviewKind?: InterviewKind;
 }): InterviewBlueprint {
+  const kind: InterviewKind = args.interviewKind ?? "system_design";
+  if (kind === "consulting_case") {
+    return buildConsultingCaseBlueprint({
+      candidateName: args.candidateName,
+      jobDescription: args.jobDescription,
+      resumeSummary: args.resumeSummary,
+      resumeText: args.resumeText,
+      teammateSpecializationOverride: args.teammateSpecializationOverride ?? null,
+      sessionEntropy: args.sessionEntropy,
+    });
+  }
+
   const entropy = normalizeText(args.sessionEntropy ?? `${args.candidateName}-${args.resumeSummary.length}-${args.resumeText.length}`);
   const combined = normalizeText(
     [args.jobDescription, args.resumeSummary, args.resumeText].filter(Boolean).join("\n"),
