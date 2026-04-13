@@ -202,6 +202,8 @@ export default defineSchema({
     teammateConcernCount: v.number(),
     revisionCount: v.number(),
     hintFishingCount: v.number(),
+    /** Candidate messages matching full-handoff / hidden-rubric heuristics (see lib/integrity.ts). */
+    fullSolutionSolicitationCount: v.optional(v.number()),
     totalTokens: v.number(),
     totalInputTokens: v.number(),
     totalOutputTokens: v.number(),

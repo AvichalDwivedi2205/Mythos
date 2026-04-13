@@ -4,6 +4,7 @@ import { mutation, query } from "./_generated/server";
 import { RateLimiter, MINUTE } from "@convex-dev/rate-limiter";
 import { getChannelByKind, getSessionByPublicId, getSessionCounters } from "./lib/db";
 import { computeTimedPhaseFromSession } from "../lib/timed-phase";
+import { detectFullSolutionSolicitation } from "../lib/integrity";
 import {
   sendCandidateMessageResultValidator,
   streamingResponseValidator,
@@ -124,9 +125,14 @@ export const sendCandidateMessage = mutation({
       visibleToCandidate: true,
     });
 
+    const priorSolicitation = counters.fullSolutionSolicitationCount ?? 0;
+    const solicitationHit = detectFullSolutionSolicitation(content);
+    const fullSolutionSolicitationCount = priorSolicitation + (solicitationHit ? 1 : 0);
+
     await ctx.db.patch(counters._id, {
       nextSequence: sequence,
       candidateMessageCount: counters.candidateMessageCount + 1,
+      ...(solicitationHit ? { fullSolutionSolicitationCount } : {}),
     });
 
     await ctx.db.insert("events", {
@@ -191,9 +197,8 @@ export const sendCandidateMessage = mutation({
 
     return {
       queued: true,
-      blocked: false,
       messageId,
-      warning: null,
+      fullSolutionSolicitationCount,
     };
   },
 });

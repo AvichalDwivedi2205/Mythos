@@ -81,6 +81,7 @@ export const aiSmokeTest = action({
         collaborationScore: 61,
         nudgesGiven: 1,
       },
+      fullSolutionSolicitationCount: 0,
     };
 
     const interviewer = await generateVisibleResponse(ctx, {

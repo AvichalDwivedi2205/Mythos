@@ -66,6 +66,8 @@ function getBadgeClass(badgeKind: string | null) {
   switch (badgeKind) {
     case "stress":
       return "mbg bg-stress";
+    case "warning":
+      return "mbg bg-warning";
     case "nudge":
     case "concern":
       return "mbg bg-nudge";
@@ -94,6 +96,7 @@ function bubbleAccent(badgeKind: string | null, speakerType: string) {
   if (speakerType !== "interviewer") return "";
   if (badgeKind === "nudge" || badgeKind === "concern") return " bnudge";
   if (badgeKind === "stress") return " bstress";
+  if (badgeKind === "warning") return " bwarning";
   return "";
 }
 
@@ -413,9 +416,6 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
           content,
           streamResponse: streamResponses,
         });
-        if (result.blocked && result.warning) {
-          return;
-        }
         if (channelKind === "interviewer") {
           setDraftInterviewer("");
         } else {
@@ -524,7 +524,9 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                       ? "var(--blue)"
                       : message.badgeKind === "stress"
                         ? "var(--red)"
-                        : "var(--amber)",
+                        : message.badgeKind === "warning"
+                          ? "var(--warning)"
+                          : "var(--amber)",
                 }}
               />
               {message.eventSummary}
@@ -770,6 +772,19 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                     </div>
                     <div className="svl">{room.counters.stressCount}</div>
                   </div>
+                  <div className="sr">
+                    <div className="snm">Handoff attempts</div>
+                    <div className="str">
+                      <div
+                        className="sfi"
+                        style={{
+                          width: `${Math.min(100, room.counters.fullSolutionSolicitationCount * 25)}%`,
+                          background: "var(--warning)",
+                        }}
+                      />
+                    </div>
+                    <div className="svl">{room.counters.fullSolutionSolicitationCount}</div>
+                  </div>
                 </div>
               </button>
               <ThemeToggle />
@@ -961,11 +976,7 @@ export function InterviewRoom({ sessionPublicId }: { sessionPublicId: string }) 
                       className="edot"
                       style={{
                         background:
-                          note.type === "stress_event_started"
-                            ? "var(--red)"
-                            : note.type === "integrity_warning"
-                              ? "var(--amber)"
-                              : "var(--blue)",
+                          note.type === "stress_event_started" ? "var(--red)" : "var(--blue)",
                       }}
                     />
                     <div>

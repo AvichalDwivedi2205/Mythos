@@ -203,17 +203,6 @@ function mapEventToNotification(type: string, metadataJson: string, createdAt: n
     };
   }
 
-  if (type === "integrity_warning") {
-    return {
-      type,
-      title: metadata.title ?? "Interview warning",
-      detail:
-        metadata.detail ??
-        "The message crossed an interview guardrail. Rephrase it around a specific tradeoff or design slice.",
-      createdAt,
-    };
-  }
-
   if (type === "final_solution_submitted") {
     return {
       type,

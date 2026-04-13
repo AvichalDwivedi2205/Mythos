@@ -58,6 +58,7 @@ const processingContextValidator = v.object({
     collaborationScore: v.number(),
     nudgesGiven: v.number(),
   }),
+  fullSolutionSolicitationCount: v.number(),
 });
 
 export const getProcessingContext = internalQuery({
@@ -94,7 +95,16 @@ export const getProcessingContext = internalQuery({
       .order("desc")
       .take(80);
 
-    if (!activeChannel || !counterpartChannel || !candidateMessage || !sessionState || !signals) {
+    const sessionCounters = await getSessionCounters(ctx, args.sessionId);
+
+    if (
+      !activeChannel ||
+      !counterpartChannel ||
+      !candidateMessage ||
+      !sessionState ||
+      !signals ||
+      !sessionCounters
+    ) {
       throw new Error("Interview context is incomplete.");
     }
 
@@ -165,6 +175,7 @@ export const getProcessingContext = internalQuery({
         collaborationScore: signals.collaborationScore,
         nudgesGiven: signals.nudgesGiven,
       },
+      fullSolutionSolicitationCount: sessionCounters.fullSolutionSolicitationCount ?? 0,
     };
   },
 });
@@ -180,6 +191,7 @@ export const persistGeneratedResponse = internalMutation({
       v.literal("brief"),
       v.literal("nudge"),
       v.literal("stress"),
+      v.literal("warning"),
       v.literal("concern"),
       v.literal("clarification"),
       v.literal("team"),
@@ -573,37 +585,6 @@ export const applyTurnAnalysis = internalMutation({
       snapshotType: "live",
       createdAt: now,
     });
-
-    const integrity = analysis.candidateIntegrity ?? {
-      concernLevel: "none" as const,
-      summary: null,
-      patterns: [] as Array<
-        "solicits_full_solution" | "solicits_hidden_rubric_or_ideal_answer" | "other_interview_pressure"
-      >,
-    };
-    const seriousIntegrity =
-      integrity &&
-      (integrity.concernLevel === "medium" ||
-        (integrity.concernLevel === "low" &&
-          integrity.patterns.some((p) =>
-            ["solicits_full_solution", "solicits_hidden_rubric_or_ideal_answer"].includes(p),
-          )));
-    if (seriousIntegrity && integrity.summary) {
-      await ctx.db.insert("events", {
-        sessionId: args.sessionId,
-        channelId: null,
-        messageId: args.candidateMessageId,
-        type: "integrity_warning",
-        actor: "system",
-        target: "candidate",
-        metadataJson: JSON.stringify({
-          code: "ai_assessed_pressure",
-          title: "Interview guardrail",
-          detail: integrity.summary,
-        }),
-        createdAt: now,
-      });
-    }
 
     return null;
   },

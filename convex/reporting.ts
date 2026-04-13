@@ -76,6 +76,7 @@ export const getReportContext = internalQuery({
             stressCount: counters.stressCount,
             clarificationCount: counters.clarificationCount,
             teammateConcernCount: counters.teammateConcernCount,
+            fullSolutionSolicitationCount: counters.fullSolutionSolicitationCount ?? 0,
             totalTokens: counters.totalTokens,
           },
           null,

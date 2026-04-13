@@ -131,6 +131,9 @@ function deriveEventSummary(
     if (badgeKind === "nudge") {
       return "Redirecting to a missing design gap";
     }
+    if (badgeKind === "warning") {
+      return "Declining a full handoff; steering back to owned reasoning";
+    }
     if (mode === "brief") {
       return "Interviewer follow-up";
     }
@@ -142,6 +145,9 @@ function deriveEventSummary(
   }
   if (badgeKind === "concern") {
     return "Pressure-testing the current plan";
+  }
+  if (badgeKind === "warning") {
+    return "Declining a full handoff; staying in sparring-partner mode";
   }
   return "Teammate follow-up";
 }
@@ -178,7 +184,8 @@ export function buildVisibleResponseOutputContract(channelKind: VisibleChannelKi
 - needsClarification: boolean
 - clarificationQuestion: string or null
 - if unsure, default to mode="${defaultMode}" and badgeKind="${defaultBadge}"
-- never use "challenge" as badgeKind; "challenge" is only valid for mode`;
+- never use "challenge" as badgeKind; "challenge" is only valid for mode
+- use badgeKind "warning" only when pushing back on a request for a complete handoff, hidden rubric, or ideal graded answer`;
 }
 
 export function repairVisibleAgentResponse(

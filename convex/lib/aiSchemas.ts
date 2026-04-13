@@ -16,6 +16,7 @@ export const visibleResponseBadgeKinds = [
   "brief",
   "nudge",
   "stress",
+  "warning",
   "concern",
   "clarification",
   "team",

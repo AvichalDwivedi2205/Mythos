@@ -150,6 +150,7 @@ export const createSession = mutation({
       teammateConcernCount: 0,
       revisionCount: 0,
       hintFishingCount: 0,
+      fullSolutionSolicitationCount: 0,
       totalTokens: 0,
       totalInputTokens: 0,
       totalOutputTokens: 0,
@@ -322,6 +323,7 @@ export const getRoom = query({
         stressCount: counters.stressCount,
         clarificationCount: counters.clarificationCount,
         teammateConcernCount: counters.teammateConcernCount,
+        fullSolutionSolicitationCount: counters.fullSolutionSolicitationCount ?? 0,
       },
     };
   },
@@ -446,7 +448,16 @@ async function insertMessage(
     speakerLabel: string;
     content: string;
     phase: "problem_framing" | "requirements" | "high_level_design" | "deep_dive" | "stress_and_defense" | "wrap_up";
-    badgeKind: "brief" | "nudge" | "stress" | "concern" | "clarification" | "team" | "system" | null;
+    badgeKind:
+      | "brief"
+      | "nudge"
+      | "stress"
+      | "warning"
+      | "concern"
+      | "clarification"
+      | "team"
+      | "system"
+      | null;
     eventSummary: string | null;
   },
 ) {

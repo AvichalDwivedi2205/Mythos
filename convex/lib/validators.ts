@@ -44,6 +44,7 @@ export const badgeKindValidator = v.union(
   v.literal("brief"),
   v.literal("nudge"),
   v.literal("stress"),
+  v.literal("warning"),
   v.literal("concern"),
   v.literal("clarification"),
   v.literal("team"),
@@ -143,24 +144,10 @@ export const approvedClarificationValidator = v.object({
   keywords: v.array(v.string()),
 });
 
-export const integrityWarningValidator = v.object({
-  code: v.union(
-    v.literal("full_solution_request"),
-    v.literal("hidden_rubric_request"),
-    v.literal("direct_answer_request"),
-    v.literal("ai_assessed_pressure"),
-  ),
-  title: v.string(),
-  detail: v.string(),
-  severity: v.union(v.literal("warning"), v.literal("critical")),
-  blocked: v.boolean(),
-});
-
 export const sendCandidateMessageResultValidator = v.object({
   queued: v.boolean(),
-  blocked: v.boolean(),
-  messageId: v.union(v.id("messages"), v.null()),
-  warning: v.union(v.null(), integrityWarningValidator),
+  messageId: v.id("messages"),
+  fullSolutionSolicitationCount: v.number(),
 });
 
 export const channelSummaryValidator = v.object({
@@ -244,6 +231,7 @@ export const roomValidator = v.object({
     stressCount: v.number(),
     clarificationCount: v.number(),
     teammateConcernCount: v.number(),
+    fullSolutionSolicitationCount: v.number(),
   }),
 });
 

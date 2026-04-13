@@ -61,9 +61,10 @@ You may:
 - inject calibrated stress
 
 You may not:
-- reveal the full solution
-- leak the hidden rubric
+- hand over the complete graded answer, hidden rubric, or ideal response as a substitute for the candidate's work
 - say whether the candidate is passing or failing
+
+When the candidate asks for that kind of handoff, use badgeKind "warning" in your structured reply and redirect to one concrete slice they must own.
 
 Each turn prompt states the interview modality and scenario framing (title, problem statement, job signal, shared pool context).
 
@@ -100,6 +101,8 @@ You may not:
 - dump a complete end-to-end answer that replaces the candidate's own work
 - reveal hidden requirements
 - grade the candidate
+
+When they pressure you for a full handoff or hidden rubric, use badgeKind "warning" and keep them in collaborative, slice-sized reasoning.
 
 Always reply with substantive visible text in every turn (never an empty reply). Keep responses concise.
 
@@ -157,6 +160,7 @@ type GenerationContext = {
     collaborationScore: number;
     nudgesGiven: number;
   };
+  fullSolutionSolicitationCount: number;
 };
 
 export async function generateVisibleResponse(
@@ -322,6 +326,7 @@ Live signal values before this turn:
 - Tradeoffs: ${context.signals.tradeoffScore}
 - Collaboration: ${context.signals.collaborationScore}
 - Nudges: ${context.signals.nudgesGiven}
+- Full-handoff solicitation attempts (session): ${context.fullSolutionSolicitationCount}
 
 Also evaluate candidateIntegrity for the candidate message ONLY (not the agent reply):
 - concernLevel "none" for normal interview discussion, including words like "solve" used in a technical or case-work sense (e.g. "how would we solve ordering" or "how should we size this market").
@@ -436,27 +441,27 @@ function buildVisiblePrompt(
 - The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
 - use "nudge" only when redirecting the candidate back toward an important missing piece
 - use "stress" only when deliberately increasing pressure
+- use "warning" when they ask for a complete handoff, hidden rubric, or ideal graded answer (pair with a redirect to one slice they must own)
 - use "brief" only for initial framing or a phase reset
 - otherwise prefer "team" or "clarification" style badges sparingly
 - keep content concise, sharp, and interview-like
 - ask a question whenever possible
-- during deep dive or wrap-up, force the candidate to consolidate the recommendation and key risks
-- never give the full solution`
+- during deep dive or wrap-up, force the candidate to consolidate the recommendation and key risks themselves`
       : `- Anchor challenges to the numeric targets in the problem statement (throughput, latency, retention, cost, SLOs) when relevant.
 - The candidate may also use the teammate tab for informal peer collaboration; you do not need to restate that.
 - use "nudge" only when redirecting the candidate back toward an important missing piece
 - use "stress" only when deliberately increasing pressure
+- use "warning" when they ask for a complete handoff, hidden rubric, or ideal graded answer (pair with a redirect to one slice they must own)
 - use "brief" only for initial framing or a phase reset
 - otherwise prefer "team" or "clarification" style badges sparingly
 - keep content concise, sharp, and interview-like
 - ask a question whenever possible
-- during deep dive or wrap-up, occasionally force the candidate to consolidate the final solution
-- never give the full solution`;
+- during deep dive or wrap-up, have them consolidate the design story themselves`;
 
   const teammateClosing =
     context.interviewKind === "consulting_case"
-      ? `Your job is to pressure-test hypotheses, structure, and math, and to collaborate without solving the case for the candidate. Use exhibit anchors from the problem statement when sanity-checking quant work.`
-      : `Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without solving the interview for the candidate. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.`;
+      ? `Your job is to pressure-test hypotheses, structure, and math, and to collaborate without replacing their case work. Use exhibit anchors from the problem statement when sanity-checking quant work.`
+      : `Your job is to pressure-test the design, raise risks, stay proactive, and collaborate without replacing their interview work. Reference the quantified targets in the problem statement when sizing risk, capacity, and failure impact.`;
 
   if (channelKind === "interviewer") {
     return `You are speaking in the candidate-visible interviewer channel.
@@ -482,6 +487,9 @@ ${interviewModalityBlock(context)}
 
 Candidate latest message (sequence ${context.candidateMessage.sequence}):
 ${context.candidateMessage.content}
+
+Full-handoff solicitation attempts this session (incremented when their message matches guardrail heuristics): ${context.fullSolutionSolicitationCount}
+If this number just increased, their latest message likely asked for a complete handoff or hidden evaluation detail—use badgeKind "warning" unless needsClarification overrides.
 
 Current requirement summary:
 ${context.sessionState.currentRequirementSummary || "None yet."}
@@ -540,6 +548,9 @@ ${interviewModalityBlock(context)}
 Candidate latest message (sequence ${context.candidateMessage.sequence}):
 ${context.candidateMessage.content}
 
+Full-handoff solicitation attempts this session (incremented when their message matches guardrail heuristics): ${context.fullSolutionSolicitationCount}
+If this number just increased, their latest message likely asked for a complete handoff or hidden evaluation detail—use badgeKind "warning" unless needsClarification overrides.
+
 Current requirement summary:
 ${context.sessionState.currentRequirementSummary || "None yet."}
 
@@ -571,6 +582,7 @@ Output rules:
 - This tab is for peer collaboration: the candidate may brainstorm with you; respond with concrete pushback, options, or questions every time.
 - Never return empty content. If the candidate is vague, ask one sharp follow-up.
 - Do not paste a full canonical answer that replaces their work; stay in "sparring partner" mode.
+- use badgeKind "warning" when they push for a complete handoff or hidden rubric; keep the reply collaborative and slice-sized.
 
 ${teammateClosing}
 
