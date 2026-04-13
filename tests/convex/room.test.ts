@@ -115,6 +115,7 @@ describe("convex room flows", () => {
     });
 
     expect(room?.title).toBe("Real-Time Chat at Scale");
+    expect(room?.interviewKind).toBe("system_design");
     expect(room?.channels).toHaveLength(2);
     expect(room?.signals.requirementsScore).toBe(60);
   });
